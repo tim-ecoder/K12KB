@@ -6,7 +6,7 @@
   "icon-capslock" : "ic_eng_shift_all",
   "flag" : "ic_flag_gb_col",
   "custom-keyboard-mechanics": "bb_key_1_2/keyboard_mechanics",
-  "device-model-regexp" : "Blackberry (BBB|BBF|BBE|unknown).*"
+  "device-model-regexp" : "(Blackberry (BBB|BBF|BBE|unknown).*)|(.*KEY2)"
 }, {
   "options-name" : "Blackberry Key1|2 Русский",
   "keyboard-mapping" : "bb_key_1_2/russian_hw",
@@ -15,7 +15,7 @@
   "icon-capslock" : "ic_rus_shift_all",
   "flag" : "ic_flag_russia_col",
   "custom-keyboard-mechanics": "bb_key_1_2/keyboard_mechanics",
-  "device-model-regexp" : "Blackberry (BBB|BBF|BBE|unknown).*"
+  "device-model-regexp" : "(Blackberry (BBB|BBF|BBE|unknown).*)|(.*KEY2)"
 }, {
   "options-name" : "Blackberry Key1|2 Русский (Транслит)",
   "keyboard-mapping" : "bb_key_1_2/russian_translit_hw",
@@ -24,7 +24,7 @@
   "icon-capslock" : "ic_rus_shift_all",
   "flag" : "ic_flag_russia_col",
   "custom-keyboard-mechanics": "bb_key_1_2/keyboard_mechanics",
-  "device-model-regexp" : "Blackberry (BBB|BBF|BBE|unknown).*"
+  "device-model-regexp" : "(Blackberry (BBB|BBF|BBE|unknown).*)|(.*KEY2)"
 }, {
   "options-name" : "Blackberry Key1|2 Украинский",
   "keyboard-mapping" : "bb_key_1_2/ukraine_hw",
@@ -33,7 +33,7 @@
   "icon-capslock" : "ic_ukr_shift_all",
   "flag" : "ic_flag_ukraine_col",
   "custom-keyboard-mechanics": "bb_key_1_2/keyboard_mechanics",
-  "device-model-regexp" : "Blackberry (BBB|BBF|BBE|unknown).*"
+  "device-model-regexp" : "(Blackberry (BBB|BBF|BBE|unknown).*)|(.*KEY2)"
 }, {
   "options-name" : "Unihertz Pocket|Slim English (v1)",
   "keyboard-mapping" : "uhtz_slim_pocket/titan_slim_english_hw",

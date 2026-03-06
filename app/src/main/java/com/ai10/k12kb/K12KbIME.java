@@ -396,6 +396,9 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
                 && wordPredictor != null
                 && getCurrentInputConnection() != null
                 && IsInputMode()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                this.requestShowSelf(InputMethodManager.SHOW_IMPLICIT);
+            }
         }
 
         onStartInputPrediction();
