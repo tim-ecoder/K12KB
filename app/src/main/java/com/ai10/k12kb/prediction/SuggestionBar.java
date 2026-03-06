@@ -80,10 +80,10 @@ public class SuggestionBar extends LinearLayout {
         // Padding so slots don't overlap the divider stripes
         setPadding(0, dividerPx, 0, dividerPx);
 
-        // Auto-compute font size: roughly 40% of height in dp
-        float fontSizeSp = heightDp * 0.4f;
-        if (fontSizeSp < 10) fontSizeSp = 10;
-        if (fontSizeSp > 24) fontSizeSp = 24;
+        // Auto-compute font size: roughly 70% of height in dp
+        float fontSizeSp = heightDp * 0.70f;
+        if (fontSizeSp < 14) fontSizeSp = 14;
+        if (fontSizeSp > 40) fontSizeSp = 40;
 
         int insetPx = (int) TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP, SLOT_INSET_DP, getResources().getDisplayMetrics());

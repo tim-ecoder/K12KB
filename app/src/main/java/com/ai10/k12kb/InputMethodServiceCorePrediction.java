@@ -2,7 +2,9 @@ package com.ai10.k12kb;
 
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputConnection;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.ai10.k12kb.prediction.SuggestionBar;
@@ -120,7 +122,7 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
                     translations = translations.subList(0, translationSlotCount);
                 }
                 suggestionBar.updateTranslation(translations, word, translationSlotCount, isPhraseMatch, phraseResultCount);
-                setCandidatesViewShown(true);
+                setSuggestionBarShown(true);
                 return;
             }
         }
@@ -130,10 +132,10 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
         }
         suggestionBar.update(suggestions, wordPredictor.getCurrentWord());
         if (suggestions != null && !suggestions.isEmpty()) {
-            setCandidatesViewShown(true);
+            setSuggestionBarShown(true);
         } else {
             //Do not close suggestion bar, either it jumps
-            //setCandidatesViewShown(false);
+            //setSuggestionBarShown(false);
         }
     }
 
@@ -175,7 +177,7 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
             if (predictionBarHiddenByDefault && !predictionBarVisibleThisSession) {
                 predictionBarVisibleThisSession = true;
                 predictionBarOpenedByTranslation = true;
-                setCandidatesViewShown(true);
+                setSuggestionBarShown(true);
             }
             // Translate current word immediately
             if (wordPredictor != null) {
@@ -191,7 +193,7 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
                             translations = translations.subList(0, translationSlotCount);
                         }
                         suggestionBar.updateTranslation(translations, word, translationSlotCount, isPhraseMatch, phraseCount);
-                        setCandidatesViewShown(true);
+                        setSuggestionBarShown(true);
                     }
                 }
             }
@@ -200,7 +202,7 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
             if (predictionBarOpenedByTranslation) {
                 predictionBarOpenedByTranslation = false;
                 predictionBarVisibleThisSession = false;
-                setCandidatesViewShown(false);
+                setSuggestionBarShown(false);
                 suggestionBar.clear();
             } else if (wordPredictor != null) {
                 // Force engine to recompute suggestions for current word
@@ -225,7 +227,7 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
 
         if(!predictionBarVisibleThisSession) {
             predictionBarVisibleThisSession = true;
-            setCandidatesViewShown(true);
+            setSuggestionBarShown(true);
             Toast.makeText(getApplicationContext(), "\uD83D\uDD2E Predictions ON", Toast.LENGTH_SHORT).show();
             // Read word at cursor and force prediction update
             InputConnection ic = getCurrentInputConnection();
@@ -242,7 +244,7 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
             suggestionBar.update(wordPredictor.getLatestSuggestions(), wordPredictor.getCurrentWord());
         } else {
             predictionBarVisibleThisSession = false;
-            setCandidatesViewShown(false);
+            setSuggestionBarShown(false);
             Toast.makeText(getApplicationContext(), "\uD83D\uDD2E Predictions OFF", Toast.LENGTH_SHORT).show();
         }
         return true;
@@ -292,26 +294,54 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
         return "en";
     }
 
+    // --- Suggestion bar visibility (replaces framework setCandidatesViewShown) ---
+
+    protected void setSuggestionBarShown(boolean shown) {
+        if (suggestionBar != null) {
+            suggestionBar.setVisibility(shown ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /**
+     * Wraps keyboardView and suggestionBar into a single input view container.
+     * Call this from onCreateInputView() instead of returning keyboardView alone.
+     */
+    protected View createInputViewWithSuggestions(View keyboardView) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        if (suggestionBar != null) {
+            if (suggestionBar.getParent() != null) {
+                ((ViewGroup) suggestionBar.getParent()).removeView(suggestionBar);
+            }
+            container.addView(suggestionBar);
+        }
+
+        if (keyboardView != null) {
+            if (keyboardView.getParent() != null) {
+                ((ViewGroup) keyboardView.getParent()).removeView(keyboardView);
+            }
+            container.addView(keyboardView);
+        }
+
+        return container;
+    }
+
     // --- Lifecycle overrides ---
 
     @Override
     public View onCreateCandidatesView() {
-        Log.d(TAG2, "onCreateCandidatesView");
-        if (suggestionBar != null) {
-            return suggestionBar;
-        }
-        return super.onCreateCandidatesView();
+        // Suggestion bar is embedded in the input view — no framework candidates needed
+        return null;
     }
 
     @Override
     public void onComputeInsets(Insets outInsets) {
         super.onComputeInsets(outInsets);
-        if (suggestionBar != null && suggestionBar.getVisibility() == View.VISIBLE
-                && suggestionBar.getHeight() > 0) {
-            // Tell the system that the visible area includes the suggestion bar
-            // so the app content gets pushed up
-            outInsets.contentTopInsets = outInsets.visibleTopInsets;
-        }
+        outInsets.contentTopInsets = outInsets.visibleTopInsets;
     }
 
     @Override
@@ -395,7 +425,7 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
                             if (translations.size() > translationSlotCount)
                                 translations = translations.subList(0, translationSlotCount);
                             suggestionBar.updateTranslation(translations, word, translationSlotCount, isPhraseMatch, phraseCount);
-                            setCandidatesViewShown(true);
+                            setSuggestionBarShown(true);
                         }
                     }
                 });
@@ -407,10 +437,10 @@ public abstract class InputMethodServiceCorePrediction extends InputMethodServic
     protected void onStartInputPrediction() {
         predictionBarVisibleThisSession = false;
         if (wordPredictor != null && !predictionBarHiddenByDefault) {
-            setCandidatesViewShown(true);
+            setSuggestionBarShown(true);
             updatePredictorWordAtCursor();
         } else {
-            setCandidatesViewShown(false);
+            setSuggestionBarShown(false);
         }
     }
 

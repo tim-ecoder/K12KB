@@ -320,7 +320,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         }
         super.onCreateInputView();
         keyboardView.setOnKeyboardActionListener(this);
-        return keyboardView;
+        return createInputViewWithSuggestions(keyboardView);
     }
 
 
@@ -1079,7 +1079,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
                     keyboardView.setVisibility(View.GONE);
                 }
                 if (!predictionBarHiddenByDefault || predictionBarVisibleThisSession) {
-                    setCandidatesViewShown(true);
+                    setSuggestionBarShown(true);
                 }
             } else {
                 HideKeyboard();
