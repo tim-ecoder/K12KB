@@ -217,10 +217,11 @@ public class K12KbAccessibilityService extends AccessibilityService {
                 }
                 //Этот хак нужен чтобы не было никакой работы плагинов, когда пользователь набирает большие тексты, которые генерят как раз эти события
                 //if(event.getContentChangeTypes() == AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE)
-                    if(event.getClassName().toString().equalsIgnoreCase("android.widget.EditText")
-                            || event.getClassName().toString().equalsIgnoreCase("android.webkit.WebView")
-                            || event.getClassName().toString().equalsIgnoreCase("android.widget.ScrollView")
-                    ) {
+                    CharSequence className = event.getClassName();
+                    if(className != null && (className.toString().equalsIgnoreCase("android.widget.EditText")
+                            || className.toString().equalsIgnoreCase("android.webkit.WebView")
+                            || className.toString().equalsIgnoreCase("android.widget.ScrollView")
+                    )) {
                         Log.d(TAG3, "IGNORING android.widget.EditText || android.webkit.WebView || android.widget.ScrollView at:" + event.getPackageName());
                         //android.widget.ScrollView
                         return;
