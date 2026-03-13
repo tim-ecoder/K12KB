@@ -293,8 +293,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         if (telephonyManager != null) {
             telephonyManager.listen(callStateCallback, PhoneStateListener.LISTEN_NONE);
         }
-        if(mVoiceRecognitionTrigger != null
-                && mVoiceRecognitionTrigger.isInstalled()) {
+        if(mVoiceRecognitionTrigger != null) {
             mVoiceRecognitionTrigger.unregister(this);
         }
         super.onDestroy();

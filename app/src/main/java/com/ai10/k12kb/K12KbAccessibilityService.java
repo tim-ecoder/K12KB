@@ -883,6 +883,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
     }
 
     private AccessibilityNodeInfo FindOrGetFromCache(AccessibilityNodeInfo root, SearchClickPlugin searchClickPlugin) {
+        if(root == null) return null;
         AccessibilityNodeInfo info = null;
         String fieldId = searchClickPlugin.getId();
         if(fieldId != "") {
