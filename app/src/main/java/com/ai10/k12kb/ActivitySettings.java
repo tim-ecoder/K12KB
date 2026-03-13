@@ -397,6 +397,16 @@ public class ActivitySettings extends Activity {
             }
         });
 
+        Switch switchTransparencyMode = (Switch) findViewById(R.id.switch_transparency_mode);
+        k12KbSettings.CheckSettingOrSetDefault(k12KbSettings.APP_PREFERENCES_29_TRANSPARENCY_MODE, true);
+        SetSwitchStateOrDefault(switchTransparencyMode, k12KbSettings.APP_PREFERENCES_29_TRANSPARENCY_MODE);
+        switchTransparencyMode.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                k12KbSettings.SetBooleanValue(k12KbSettings.APP_PREFERENCES_29_TRANSPARENCY_MODE, isChecked);
+            }
+        });
+
         Switch switchLightTheme = (Switch) findViewById(R.id.switch_light_theme);
         SetSwitchStateOrDefault(switchLightTheme, k12KbSettings.APP_PREFERENCES_18_LIGHT_THEME);
         switchLightTheme.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {

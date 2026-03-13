@@ -45,7 +45,10 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
     protected int pref_pointer_mode_rect_color = 0;
     protected boolean pref_auto_capitalization = true;
     protected boolean pref_nav_pad_on_hold = true;
+    protected boolean pref_transparency_mode = true;
 
+    static final String TRANSPARENCY_MODE_PREFIX = "TRANSPARENCY_MODE_";
+    protected boolean _currentAppTransparency = true;
 
     private boolean metaHoldCtrl; // только первая буква будет большая
     protected boolean metaFixedModeFirstLetterUpper; // только первая буква будет большая
@@ -637,6 +640,7 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
         Methods.put("ActionSendCharDoublePressShiftMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharDoublePressShiftMode(p); } }, KeyPressData.class));
         //2.4
         Methods.put("ActionSetKeyTransparency", objAction("ActionSetKeyTransparency"));
+        Methods.put("ActionToggleTransparencyMode", objAction("ActionToggleTransparencyMode"));
         Methods.put("InputIsInputFieldAndEnteredText", objAction("InputIsInputFieldAndEnteredText"));
         Methods.put("PrefEnsureEnteredText", objAction("PrefEnsureEnteredText"));
         Methods.put("InputIsDigitsPad", objAction("InputIsDigitsPad"));
@@ -1226,6 +1230,29 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
     //Это нужно например для KEYCODE_HOME который нет возможности (пока) эмулировать программно
     public boolean ActionSetKeyTransparency() {
         _isKeyTransparencyInsideUpDownEvent = true;
+        return true;
+    }
+
+    boolean GetTransparencyForCurrentApp() {
+        if (_lastPackageName == null || _lastPackageName.isEmpty())
+            return pref_transparency_mode;
+        String prefName = TRANSPARENCY_MODE_PREFIX + _lastPackageName;
+        String stored = k12KbSettings.GetStringValue(prefName);
+        if (stored.isEmpty())
+            return pref_transparency_mode;
+        return Boolean.parseBoolean(stored);
+    }
+
+    public boolean ActionToggleTransparencyMode() {
+        _currentAppTransparency = !_currentAppTransparency;
+        if (_lastPackageName != null && !_lastPackageName.isEmpty()) {
+            k12KbSettings.SetStringValue(
+                TRANSPARENCY_MODE_PREFIX + _lastPackageName,
+                String.valueOf(_currentAppTransparency));
+        }
+        Toast.makeText(getApplicationContext(),
+            _currentAppTransparency ? "Transparency ON" : "Transparency OFF",
+            Toast.LENGTH_SHORT).show();
         return true;
     }
 

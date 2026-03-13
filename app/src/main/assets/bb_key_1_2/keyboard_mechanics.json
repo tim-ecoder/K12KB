@@ -878,9 +878,8 @@
           "meta-mode-method-names": [
             "MetaIsAltPressed"
           ],
-          "action-method-name": "ActionKeyDown",
-          "stop-processing-at-success-result": true,
-          "custom-key-code": "KEYCODE_MENU"
+          "action-method-name": "ActionToggleTransparencyMode",
+          "stop-processing-at-success-result": true
         }, {
           "meta-mode-method-names": [
             "MetaIsCtrlPressed"

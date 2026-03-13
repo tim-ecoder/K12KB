@@ -376,6 +376,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
             //PackageHistory.add(_lastPackageName);
             _lastPackageName = editorInfo.packageName;
             isPackageChangedInsideSingleEvent = true;
+            _currentAppTransparency = GetTransparencyForCurrentApp();
 
         }
 
@@ -480,6 +481,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
 
         if(
             !IsInputMode()
+            && _currentAppTransparency
             && IsViewModeKeyCode(keyCode, event.getMetaState())
             && SearchPluginLauncher == null
             && !_digitsHackActive
@@ -546,6 +548,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
 
         if(
             !IsInputMode()
+            && _currentAppTransparency
             && FindAtKeyDownList(keyCode, event.getScanCode()) == null
             && IsViewModeKeyCode(keyCode, event.getMetaState())
             && SearchPluginLauncher == null)  {
@@ -1360,6 +1363,9 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         pref_pointer_mode_rect_color = k12KbSettings.GetIntValue(k12KbSettings.APP_PREFERENCES_13A_POINTER_MODE_RECT_COLOR);
         pref_nav_pad_on_hold = k12KbSettings.GetBooleanValue(k12KbSettings.APP_PREFERENCES_14_NAV_PAD_ON_HOLD);
         pref_auto_capitalization = k12KbSettings.GetBooleanValue(k12KbSettings.APP_PREFERENCES_28_AUTO_CAPITALIZATION);
+        k12KbSettings.CheckSettingOrSetDefault(k12KbSettings.APP_PREFERENCES_29_TRANSPARENCY_MODE, true);
+        pref_transparency_mode = k12KbSettings.GetBooleanValue(k12KbSettings.APP_PREFERENCES_29_TRANSPARENCY_MODE);
+        _currentAppTransparency = pref_transparency_mode;
 
         keyboard_mechanics_res = null;
 

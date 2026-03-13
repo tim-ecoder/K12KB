@@ -83,6 +83,12 @@
                 android:text="@string/pref_auto_capitalization"
                 tools:checked="true" />
 
+        <Switch
+                android:id="@+id/switch_transparency_mode"
+                style="@style/SwitchPill"
+                android:text="@string/pref_transparency_mode"
+                tools:checked="true" />
+
         <!-- EXTRA -->
         <TextView
             style="@style/SectionHeader"

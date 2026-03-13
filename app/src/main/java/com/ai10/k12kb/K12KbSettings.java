@@ -22,6 +22,7 @@ public class K12KbSettings {
     public final String APP_PREFERENCES_26_NEXT_WORD_PREDICTION = "next_word_prediction";
     public final String APP_PREFERENCES_27_KEYBOARD_AWARE = "keyboard_aware";
     public final String APP_PREFERENCES_28_AUTO_CAPITALIZATION = "auto_capitalization";
+    public final String APP_PREFERENCES_29_TRANSPARENCY_MODE = "transparency_mode";
     public final String APP_PREFERENCES_13A_POINTER_MODE_RECT_COLOR = "pointer_mode_rect_color";
     public final String APP_PREFERENCES_13_POINTER_MODE_RECT = "pointer_mode_rect";
     public final String APP_PREFERENCES_12_ENSURE_ENTERED_TEXT = "ensure_entered_text";
