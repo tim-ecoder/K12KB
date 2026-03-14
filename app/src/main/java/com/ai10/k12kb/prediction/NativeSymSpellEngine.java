@@ -155,18 +155,20 @@ public class NativeSymSpellEngine implements PredictionEngine {
     public void loadDictionary(Context context, String locale) {
         synchronized (loadLock) {
             if (ready && locale.equals(loadedLocale)) {
-                return; // already loaded — cache has user/learned words baked in
+                return; // already loaded
             }
             boolean fromCache = load(context, locale);
-            if (!fromCache && nativeSymSpell != null && nativeSymSpell.isValid()) {
-                // Fresh build — add user words, rebuild index, then save cache
+            if (nativeSymSpell != null && nativeSymSpell.isValid()) {
+                // Always load user words (even after cache load — user may have added new words)
                 int before = nativeSymSpell.size();
                 loadUserWords(context);
                 if (nativeSymSpell.size() > before) {
                     nativeSymSpell.buildIndex();
-                    Log.d(TAG, "Rebuilt index after adding " + (nativeSymSpell.size() - before) + " new user words");
+                    Log.w(TAG, "Added " + (nativeSymSpell.size() - before) + " new user words, rebuilt index");
+                    saveNativeCache(context, locale);
+                } else if (!fromCache) {
+                    saveNativeCache(context, locale);
                 }
-                saveNativeCache(context, locale);
             }
         }
     }

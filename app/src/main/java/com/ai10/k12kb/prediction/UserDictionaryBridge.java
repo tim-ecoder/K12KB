@@ -15,7 +15,7 @@ import java.util.List;
  */
 public class UserDictionaryBridge {
 
-    private static final String TAG = "UserDictionaryBridge";
+    private static final String TAG = "K12Kb-UserDict";
     private static final int DEFAULT_USER_FREQUENCY = 220; // high priority in 0-255 scale
 
     public static class UserWord {
@@ -38,6 +38,7 @@ public class UserDictionaryBridge {
         List<UserWord> result = new ArrayList<>();
         Cursor cursor = null;
         try {
+            Log.w(TAG, "Querying UserDictionary...");
             cursor = context.getContentResolver().query(
                     UserDictionary.Words.CONTENT_URI,
                     new String[]{
@@ -47,12 +48,13 @@ public class UserDictionaryBridge {
                     },
                     null, null, null);
             if (cursor == null) {
-                Log.d(TAG, "UserDictionary cursor is null (provider unavailable)");
+                Log.w(TAG, "UserDictionary cursor is null (provider unavailable)");
                 return result;
             }
             int colWord = cursor.getColumnIndex(UserDictionary.Words.WORD);
             int colFreq = cursor.getColumnIndex(UserDictionary.Words.FREQUENCY);
             int colShortcut = cursor.getColumnIndex(UserDictionary.Words.SHORTCUT);
+            Log.w(TAG, "UserDictionary cursor columns: word=" + colWord + " freq=" + colFreq + " shortcut=" + colShortcut + " count=" + cursor.getCount());
             while (cursor.moveToNext()) {
                 String word = cursor.getString(colWord);
                 if (word == null || word.isEmpty()) continue;
@@ -65,11 +67,11 @@ public class UserDictionaryBridge {
                         ? cursor.getString(colShortcut) : null;
                 result.add(new UserWord(word, freq, shortcut));
             }
-            Log.d(TAG, "Read " + result.size() + " words from UserDictionary");
+            Log.w(TAG, "Read " + result.size() + " words from UserDictionary");
         } catch (SecurityException e) {
-            Log.w(TAG, "No permission to read UserDictionary (not an IME?): " + e.getMessage());
+            Log.e(TAG, "SecurityException reading UserDictionary: " + e.getMessage(), e);
         } catch (Exception e) {
-            Log.e(TAG, "Error reading UserDictionary: " + e);
+            Log.e(TAG, "Error reading UserDictionary", e);
         } finally {
             if (cursor != null) cursor.close();
         }
