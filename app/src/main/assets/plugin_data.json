@@ -16,6 +16,11 @@
       ],
       "wait-before-send-char-ms": 200
     }, {
+      "package-name": "com.android.dialer",
+      "additional-event-type-type-window-content-changed": false,
+      "search-field-id": "com.android.dialer:id/search_view_container",
+      "wait-before-send-char-ms": 200
+    }, {
       "package-name": "com.blackberry.blackberrylauncher",
       "additional-event-type-type-window-content-changed": true,
       "search-field-id": "com.blackberry.blackberrylauncher:id/search_box_collapsed"
@@ -43,8 +48,8 @@
       "search-field-id": "com.google.android.diales:id/search_edit_text",
       "wait-before-send-char-ms": 200
     }, {
-      "package-name": "com.android.dialer",
-      "search-field-id": "com.android.dialer:id/search_box_collapsed",
+      "package-name": "com.android.dialer_old",
+      "search-field-id": "com.android.dialer_old:id/search_box_collapsed",
       "wait-before-send-char-ms": 0
     }, {
       "package-name": "com.blackberry.contacts",
