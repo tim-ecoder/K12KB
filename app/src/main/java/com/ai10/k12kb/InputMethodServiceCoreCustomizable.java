@@ -509,185 +509,139 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
         return new ActionMethod<T>(IActionMethod, class1);
     }
 
-    // Helper for KeyPressData methods resolved via reflection (for methods in subclasses)
-    private ActionMethod<KeyPressData> objActionKeyPress(final String methodName) {
-        final java.lang.reflect.Method m;
-        try {
-            m = this.getClass().getMethod(methodName, KeyPressData.class);
-        } catch (Exception e) {
-            Log.e(TAG2, "objActionKeyPress lookup error: " + methodName + " " + e);
-            return new ActionMethod<KeyPressData>(new IActionMethod<KeyPressData>() {
-                public boolean invoke(KeyPressData p) { return false; }
-            }, KeyPressData.class);
-        }
-        return new ActionMethod<KeyPressData>(new IActionMethod<KeyPressData>() {
-            public boolean invoke(KeyPressData p) {
-                try {
-                    return (Boolean) m.invoke(InputMethodServiceCoreCustomizable.this, p);
-                } catch (Exception e) {
-                    Log.e(TAG2, "objActionKeyPress invoke error: " + methodName + " " + e);
-                    return false;
-                }
-            }
-        }, KeyPressData.class);
-    }
-
-    // Helper to create IActionMethod<Object> without lambdas (avoids invokedynamic/BootstrapMethodError)
-    private ActionMethod<Object> objAction(final String methodName) {
-        final java.lang.reflect.Method m;
-        try {
-            m = this.getClass().getMethod(methodName);
-        } catch (Exception e) {
-            Log.e(TAG2, "objAction lookup error: " + methodName + " " + e);
-            return new ActionMethod<Object>(new IActionMethod<Object>() {
-                public boolean invoke(Object o) { return false; }
-            }, Object.class);
-        }
-        return new ActionMethod<Object>(new IActionMethod<Object>() {
-            public boolean invoke(Object o) {
-                try {
-                    return (Boolean) m.invoke(InputMethodServiceCoreCustomizable.this);
-                } catch (Exception e) {
-                    Log.e(TAG2, "objAction invoke error: " + methodName + " " + e);
-                    return false;
-                }
-            }
-        }, Object.class);
-    }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     private void MAIN_ActionMethodsHashMapInitializer() {
 
-        Methods.put("ActionChangeFirstLetterShiftMode", objAction("ActionChangeFirstLetterShiftMode"));
-        Methods.put("ActionChangeFirstSymbolAltMode", objAction("ActionChangeFirstSymbolAltMode"));
-        Methods.put("ActionChangeFixedAltModeState", objAction("ActionChangeFixedAltModeState"));
-        Methods.put("ActionChangeGestureModeEnableState", objAction("ActionChangeGestureModeEnableState"));
-        Methods.put("ActionChangeKeyboardLayout", objAction("ActionChangeKeyboardLayout"));
-        Methods.put("ActionChangeShiftCapslockState", objAction("ActionChangeShiftCapslockState"));
-        Methods.put("ActionChangeSwipePanelVisibility", objAction("ActionChangeSwipePanelVisibility"));
-        Methods.put("ActionDeletePreviousSymbol", objAction("ActionDeletePreviousSymbol"));
-        Methods.put("ActionDeleteUntilPrevCrLf", objAction("ActionDeleteUntilPrevCrLf"));
-        Methods.put("ActionDisableAndResetGestureMode", objAction("ActionDisableAndResetGestureMode"));
-        Methods.put("ActionDisableAndResetGesturesAtInputMode", objAction("ActionDisableAndResetGesturesAtInputMode"));
-        Methods.put("ActionDisableGestureMode", objAction("ActionDisableGestureMode"));
-        Methods.put("ActionDisableHoldAltMode", objAction("ActionDisableHoldAltMode"));
-        Methods.put("ActionDisableHoldCtrlMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionDisableHoldCtrlMode(p); } }, KeyPressData.class));
-        Methods.put("ActionDisableHoldShiftMode", objAction("ActionDisableHoldShiftMode"));
-        Methods.put("ActionDisableNavSymFnKeyboard", objAction("ActionDisableNavSymFnKeyboard"));
-        Methods.put("ActionDoNothing", objAction("ActionDoNothing"));
-        Methods.put("ActionEnableFixedAltModeState", objAction("ActionEnableFixedAltModeState"));
-        Methods.put("ActionEnableGestureAtInputModeAndUpDownMode", objAction("ActionEnableGestureAtInputModeAndUpDownMode"));
-        Methods.put("ActionEnableHoldAltMode", objAction("ActionEnableHoldAltMode"));
-        Methods.put("ActionEnableHoldCtrlMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionEnableHoldCtrlMode(p); } }, KeyPressData.class));
-        Methods.put("ActionEnableHoldShiftMode", objAction("ActionEnableHoldShiftMode"));
-        Methods.put("ActionKeyDown", InitializeMethod3(new IActionMethod<Integer>() { public boolean invoke(Integer p) { return ActionKeyDown(p); } }, Integer.class));
-        Methods.put("ActionKeyDownUpDefaultFlags", InitializeMethod3(new IActionMethod<Integer>() { public boolean invoke(Integer p) { return ActionKeyDownUpDefaultFlags(p); } }, Integer.class));
-        Methods.put("ActionKeyDownUpNoMetaKeepTouch", InitializeMethod3(new IActionMethod<Integer>() { public boolean invoke(Integer p) { return ActionKeyDownUpNoMetaKeepTouch(p); } }, Integer.class));
-        Methods.put("ActionResetDoubleClickGestureState", objAction("ActionResetDoubleClickGestureState"));
-        Methods.put("ActionSendCharDoublePressNoMeta", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharDoublePressNoMeta(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharLongPressAltSymbolAltMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharLongPressAltSymbolAltMode(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharLongPressAltSymbolNoMeta", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharLongPressAltSymbolNoMeta(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharLongPressAltSymbolShiftMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharLongPressAltSymbolShiftMode(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharLongPressCapitalize", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharLongPressCapitalize(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharLongPressCapitalizeAltMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharLongPressCapitalizeAltMode(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharSinglePressAltMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharSinglePressAltMode(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharSinglePressNoMeta", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharSinglePressNoMeta(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharSinglePressShiftMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharSinglePressShiftMode(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharSinglePressSymMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharSinglePressSymMode(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharToInput", InitializeMethod3(new IActionMethod<Character>() { public boolean invoke(Character p) { return ActionSendCharToInput(p); } }, Character.class));
-        Methods.put("ActionSendCtrlPlusKey", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCtrlPlusKey(p); } }, KeyPressData.class));
-
-        Methods.put("ActionSetNeedUpdateVisualState", objAction("ActionSetNeedUpdateVisualState"));
-        Methods.put("ActionTryAcceptCall", objAction("ActionTryAcceptCall"));
-        Methods.put("ActionTryCapitalizeFirstLetter", objAction("ActionTryCapitalizeFirstLetter"));
-        Methods.put("ActionTryChangeKeyboardLayoutAtBaseMetaShift", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionTryChangeKeyboardLayoutAtBaseMetaShift(p); } }, KeyPressData.class));
-        Methods.put("ActionTryChangeSymPadLayout", objAction("ActionTryChangeSymPadLayout"));
-        Methods.put("ActionTryChangeSymPadVisibilityAtInputMode", objAction("ActionTryChangeSymPadVisibilityAtInputMode"));
-        Methods.put("ActionTryDeclineCall", objAction("ActionTryDeclineCall"));
-        Methods.put("ActionTryDisableAltModeUponSpace", objAction("ActionTryDisableAltModeUponSpace"));
-        Methods.put("ActionTryDisableCapslockShiftMode", objAction("ActionTryDisableCapslockShiftMode"));
-        Methods.put("ActionTryDisableFirstLetterShiftMode", objAction("ActionTryDisableFirstLetterShiftMode"));
-        Methods.put("ActionTryDisableFirstSymbolAltMode", objAction("ActionTryDisableFirstSymbolAltMode"));
-        Methods.put("ActionTryDisableFixedAltModeState", objAction("ActionTryDisableFixedAltModeState"));
-        Methods.put("ActionTryDisableNavModeAndKeyboard", objAction("ActionTryDisableNavModeAndKeyboard"));
-        Methods.put("ActionTryDisableSymPad", objAction("ActionTryDisableSymPad"));
-        Methods.put("ActionTryDoubleSpaceDotSpaceConversion", objAction("ActionTryDoubleSpaceDotSpaceConversion"));
-        Methods.put("ActionTryEnableNavModeAndKeyboard", objAction("ActionTryEnableNavModeAndKeyboard"));
-        Methods.put("ActionTryResetSearchPlugin", objAction("ActionTryResetSearchPlugin"));
-        Methods.put("ActionTryTurnOffGesturesMode", objAction("ActionTryTurnOffGesturesMode"));
-        Methods.put("ActionUnCrLf", objAction("ActionUnCrLf"));
-        Methods.put("InputIsDate", objAction("InputIsDate"));
-        Methods.put("InputIsNumber", objAction("InputIsNumber"));
-        Methods.put("InputIsPhone", objAction("InputIsPhone"));
-        Methods.put("InputIsText", objAction("InputIsText"));
-        Methods.put("MetaIsActionBeforeMeta", objAction("MetaIsActionBeforeMeta"));
-        Methods.put("MetaIsPackageChanged", objAction("MetaIsPackageChanged"));
-        Methods.put("MetaIsAltMode", objAction("MetaIsAltMode"));
-        Methods.put("MetaIsAltPressed", objAction("MetaIsAltPressed"));
-        Methods.put("MetaIsCtrlPressed", objAction("MetaIsCtrlPressed"));
-        Methods.put("MetaIsShiftMode", objAction("MetaIsShiftMode"));
-        Methods.put("MetaIsShiftPressed", objAction("MetaIsShiftPressed"));
-        Methods.put("MetaIsSymPadAltShiftMode", objAction("MetaIsSymPadAltShiftMode"));
-        Methods.put("MetaStateIsOnCall", objAction("MetaStateIsOnCall"));
-        Methods.put("PrefLongPressAltSymbol", objAction("PrefLongPressAltSymbol"));
-        Methods.put("ActionTrySearchInputActivateOnLetterHack", objAction("ActionTrySearchInputActivateOnLetterHack"));
-        Methods.put("ActionSetNavModeHoldOffState", objAction("ActionSetNavModeHoldOffState"));
-        Methods.put("ActionSetNavModeHoldOnState", objAction("ActionSetNavModeHoldOnState"));
-        Methods.put("ActionTryVibrate", objAction("ActionTryVibrate"));
-        Methods.put("InputIsAnyInput", objAction("InputIsAnyInput"));
-        Methods.put("ActionChangeGestureAtInputModeUpAndDownMode", objAction("ActionChangeGestureAtInputModeUpAndDownMode"));
-        Methods.put("ActionEnableGestureAtInputMode", objAction("ActionEnableGestureAtInputMode"));
-        Methods.put("ActionSendCharDoublePressShiftMode", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharDoublePressShiftMode(p); } }, KeyPressData.class));
+        Methods.put("ActionChangeFirstLetterShiftMode", InitializeMethod3((Object o) -> ActionChangeFirstLetterShiftMode(), Object.class));
+        Methods.put("ActionChangeFirstSymbolAltMode", InitializeMethod3((Object o) -> ActionChangeFirstSymbolAltMode(), Object.class));
+        Methods.put("ActionChangeFixedAltModeState", InitializeMethod3((Object o) -> ActionChangeFixedAltModeState(), Object.class));
+        Methods.put("ActionChangeGestureModeEnableState", InitializeMethod3((Object o) -> ActionChangeGestureModeEnableState(), Object.class));
+        Methods.put("ActionChangeKeyboardLayout", InitializeMethod3((Object o) -> ActionChangeKeyboardLayout(), Object.class));
+        Methods.put("ActionChangeShiftCapslockState", InitializeMethod3((Object o) -> ActionChangeShiftCapslockState(), Object.class));
+        Methods.put("ActionChangeSwipePanelVisibility", InitializeMethod3((Object o) -> ActionChangeSwipePanelVisibility(), Object.class));
+        Methods.put("ActionDeletePreviousSymbol", InitializeMethod3((Object o) -> ActionDeletePreviousSymbol(), Object.class));
+        Methods.put("ActionDeleteUntilPrevCrLf", InitializeMethod3((Object o) -> ActionDeleteUntilPrevCrLf(), Object.class));
+        Methods.put("ActionDisableAndResetGestureMode", InitializeMethod3((Object o) -> ActionDisableAndResetGestureMode(), Object.class));
+        Methods.put("ActionDisableAndResetGesturesAtInputMode", InitializeMethod3((Object o) -> ActionDisableAndResetGesturesAtInputMode(), Object.class));
+        Methods.put("ActionDisableGestureMode", InitializeMethod3((Object o) -> ActionDisableGestureMode(), Object.class));
+        Methods.put("ActionDisableHoldAltMode", InitializeMethod3((Object o) -> ActionDisableHoldAltMode(), Object.class));
+        Methods.put("ActionDisableHoldCtrlMode", InitializeMethod3(this::ActionDisableHoldCtrlMode, KeyPressData.class));
+        Methods.put("ActionDisableHoldShiftMode", InitializeMethod3((Object o) -> ActionDisableHoldShiftMode(), Object.class));
+        Methods.put("ActionDisableNavSymFnKeyboard", InitializeMethod3((Object o) -> ActionDisableNavSymFnKeyboard(), Object.class));
+        Methods.put("ActionDoNothing", InitializeMethod3((Object o) -> ActionDoNothing(), Object.class));
+        Methods.put("ActionEnableFixedAltModeState", InitializeMethod3((Object o) -> ActionEnableFixedAltModeState(), Object.class));
+        Methods.put("ActionEnableGestureAtInputModeAndUpDownMode", InitializeMethod3((Object o) -> ActionEnableGestureAtInputModeAndUpDownMode(), Object.class));
+        Methods.put("ActionEnableHoldAltMode", InitializeMethod3((Object o) -> ActionEnableHoldAltMode(), Object.class));
+        Methods.put("ActionEnableHoldCtrlMode", InitializeMethod3(this::ActionEnableHoldCtrlMode, KeyPressData.class));
+        Methods.put("ActionEnableHoldShiftMode", InitializeMethod3((Object o) -> ActionEnableHoldShiftMode(), Object.class));
+        Methods.put("ActionKeyDown", InitializeMethod3(this::ActionKeyDown, Integer.class));
+        Methods.put("ActionKeyDownUpDefaultFlags", InitializeMethod3(this::ActionKeyDownUpDefaultFlags, Integer.class));
+        Methods.put("ActionKeyDownUpNoMetaKeepTouch", InitializeMethod3(this::ActionKeyDownUpNoMetaKeepTouch, Integer.class));
+        Methods.put("ActionResetDoubleClickGestureState", InitializeMethod3((Object o) -> ActionResetDoubleClickGestureState(), Object.class));
+        Methods.put("ActionSendCharDoublePressNoMeta", InitializeMethod3(this::ActionSendCharDoublePressNoMeta, KeyPressData.class));
+        Methods.put("ActionSendCharLongPressAltSymbolAltMode", InitializeMethod3(this::ActionSendCharLongPressAltSymbolAltMode, KeyPressData.class));
+        Methods.put("ActionSendCharLongPressAltSymbolNoMeta", InitializeMethod3(this::ActionSendCharLongPressAltSymbolNoMeta, KeyPressData.class));
+        Methods.put("ActionSendCharLongPressAltSymbolShiftMode", InitializeMethod3(this::ActionSendCharLongPressAltSymbolShiftMode, KeyPressData.class));
+        Methods.put("ActionSendCharLongPressCapitalize", InitializeMethod3(this::ActionSendCharLongPressCapitalize, KeyPressData.class));
+        Methods.put("ActionSendCharLongPressCapitalizeAltMode", InitializeMethod3(this::ActionSendCharLongPressCapitalizeAltMode, KeyPressData.class));
+        Methods.put("ActionSendCharSinglePressAltMode", InitializeMethod3(this::ActionSendCharSinglePressAltMode, KeyPressData.class));
+        Methods.put("ActionSendCharSinglePressNoMeta", InitializeMethod3(this::ActionSendCharSinglePressNoMeta, KeyPressData.class));
+        Methods.put("ActionSendCharSinglePressShiftMode", InitializeMethod3(this::ActionSendCharSinglePressShiftMode, KeyPressData.class));
+        Methods.put("ActionSendCharSinglePressSymMode", InitializeMethod3(this::ActionSendCharSinglePressSymMode, KeyPressData.class));
+        Methods.put("ActionSendCharToInput", InitializeMethod3(this::ActionSendCharToInput, Character.class));
+        Methods.put("ActionSendCtrlPlusKey", InitializeMethod3(this::ActionSendCtrlPlusKey, KeyPressData.class));
+        Methods.put("ActionSetNeedUpdateVisualState", InitializeMethod3((Object o) -> ActionSetNeedUpdateVisualState(), Object.class));
+        Methods.put("ActionTryAcceptCall", InitializeMethod3((Object o) -> ActionTryAcceptCall(), Object.class));
+        Methods.put("ActionTryCapitalizeFirstLetter", InitializeMethod3((Object o) -> ActionTryCapitalizeFirstLetter(), Object.class));
+        Methods.put("ActionTryChangeKeyboardLayoutAtBaseMetaShift", InitializeMethod3(this::ActionTryChangeKeyboardLayoutAtBaseMetaShift, KeyPressData.class));
+        Methods.put("ActionTryChangeSymPadLayout", InitializeMethod3((Object o) -> ActionTryChangeSymPadLayout(), Object.class));
+        Methods.put("ActionTryChangeSymPadVisibilityAtInputMode", InitializeMethod3((Object o) -> ActionTryChangeSymPadVisibilityAtInputMode(), Object.class));
+        Methods.put("ActionTryDeclineCall", InitializeMethod3((Object o) -> ActionTryDeclineCall(), Object.class));
+        Methods.put("ActionTryDisableAltModeUponSpace", InitializeMethod3((Object o) -> ActionTryDisableAltModeUponSpace(), Object.class));
+        Methods.put("ActionTryDisableCapslockShiftMode", InitializeMethod3((Object o) -> ActionTryDisableCapslockShiftMode(), Object.class));
+        Methods.put("ActionTryDisableFirstLetterShiftMode", InitializeMethod3((Object o) -> ActionTryDisableFirstLetterShiftMode(), Object.class));
+        Methods.put("ActionTryDisableFirstSymbolAltMode", InitializeMethod3((Object o) -> ActionTryDisableFirstSymbolAltMode(), Object.class));
+        Methods.put("ActionTryDisableFixedAltModeState", InitializeMethod3((Object o) -> ActionTryDisableFixedAltModeState(), Object.class));
+        Methods.put("ActionTryDisableNavModeAndKeyboard", InitializeMethod3((Object o) -> ActionTryDisableNavModeAndKeyboard(), Object.class));
+        Methods.put("ActionTryDisableSymPad", InitializeMethod3((Object o) -> ActionTryDisableSymPad(), Object.class));
+        Methods.put("ActionTryDoubleSpaceDotSpaceConversion", InitializeMethod3((Object o) -> ActionTryDoubleSpaceDotSpaceConversion(), Object.class));
+        Methods.put("ActionTryEnableNavModeAndKeyboard", InitializeMethod3((Object o) -> ActionTryEnableNavModeAndKeyboard(), Object.class));
+        Methods.put("ActionTryResetSearchPlugin", InitializeMethod3((Object o) -> ActionTryResetSearchPlugin(), Object.class));
+        Methods.put("ActionTryTurnOffGesturesMode", InitializeMethod3((Object o) -> ActionTryTurnOffGesturesMode(), Object.class));
+        Methods.put("ActionUnCrLf", InitializeMethod3((Object o) -> ActionUnCrLf(), Object.class));
+        Methods.put("InputIsDate", InitializeMethod3((Object o) -> InputIsDate(), Object.class));
+        Methods.put("InputIsNumber", InitializeMethod3((Object o) -> InputIsNumber(), Object.class));
+        Methods.put("InputIsPhone", InitializeMethod3((Object o) -> InputIsPhone(), Object.class));
+        Methods.put("InputIsText", InitializeMethod3((Object o) -> InputIsText(), Object.class));
+        Methods.put("MetaIsActionBeforeMeta", InitializeMethod3((Object o) -> MetaIsActionBeforeMeta(), Object.class));
+        Methods.put("MetaIsPackageChanged", InitializeMethod3((Object o) -> MetaIsPackageChanged(), Object.class));
+        Methods.put("MetaIsAltMode", InitializeMethod3((Object o) -> MetaIsAltMode(), Object.class));
+        Methods.put("MetaIsAltPressed", InitializeMethod3((Object o) -> MetaIsAltPressed(), Object.class));
+        Methods.put("MetaIsCtrlPressed", InitializeMethod3((Object o) -> MetaIsCtrlPressed(), Object.class));
+        Methods.put("MetaIsShiftMode", InitializeMethod3((Object o) -> MetaIsShiftMode(), Object.class));
+        Methods.put("MetaIsShiftPressed", InitializeMethod3((Object o) -> MetaIsShiftPressed(), Object.class));
+        Methods.put("MetaIsSymPadAltShiftMode", InitializeMethod3((Object o) -> MetaIsSymPadAltShiftMode(), Object.class));
+        Methods.put("MetaStateIsOnCall", InitializeMethod3((Object o) -> MetaStateIsOnCall(), Object.class));
+        Methods.put("PrefLongPressAltSymbol", InitializeMethod3((Object o) -> PrefLongPressAltSymbol(), Object.class));
+        Methods.put("ActionTrySearchInputActivateOnLetterHack", InitializeMethod3((Object o) -> ActionTrySearchInputActivateOnLetterHack(), Object.class));
+        Methods.put("ActionSetNavModeHoldOffState", InitializeMethod3((Object o) -> ActionSetNavModeHoldOffState(), Object.class));
+        Methods.put("ActionSetNavModeHoldOnState", InitializeMethod3((Object o) -> ActionSetNavModeHoldOnState(), Object.class));
+        Methods.put("ActionTryVibrate", InitializeMethod3((Object o) -> ActionTryVibrate(), Object.class));
+        Methods.put("InputIsAnyInput", InitializeMethod3((Object o) -> InputIsAnyInput(), Object.class));
+        Methods.put("ActionChangeGestureAtInputModeUpAndDownMode", InitializeMethod3((Object o) -> ActionChangeGestureAtInputModeUpAndDownMode(), Object.class));
+        Methods.put("ActionEnableGestureAtInputMode", InitializeMethod3((Object o) -> ActionEnableGestureAtInputMode(), Object.class));
+        Methods.put("ActionSendCharDoublePressShiftMode", InitializeMethod3(this::ActionSendCharDoublePressShiftMode, KeyPressData.class));
         //2.4
-        Methods.put("ActionSetKeyTransparency", objAction("ActionSetKeyTransparency"));
-        Methods.put("ActionToggleTransparencyMode", objAction("ActionToggleTransparencyMode"));
-        Methods.put("InputIsInputFieldAndEnteredText", objAction("InputIsInputFieldAndEnteredText"));
-        Methods.put("PrefEnsureEnteredText", objAction("PrefEnsureEnteredText"));
-        Methods.put("InputIsDigitsPad", objAction("InputIsDigitsPad"));
-        Methods.put("ActionResetDigitsHack", objAction("ActionResetDigitsHack"));
-        Methods.put("ActionTryChangeGesturePointerModeAtViewMode", objAction("ActionTryChangeGesturePointerModeAtViewMode"));
-        Methods.put("ActionTryChangeGestureModeStateAtInputMode", objAction("ActionTryChangeGestureModeStateAtInputMode"));
-        Methods.put("ActionResetGesturePointerMode", objAction("ActionResetGesturePointerMode"));
-        Methods.put("ActionTryChangeGestureInputScrollMode", objAction("ActionTryChangeGestureInputScrollMode"));
-        Methods.put("ActionTryDisableGestureInputScrollMode", objAction("ActionTryDisableGestureInputScrollMode"));
-        Methods.put("MetaIsViewMode", objAction("MetaIsViewMode"));
-        Methods.put("ActionTryPerformClickCurrentNode", objAction("ActionTryPerformClickCurrentNode"));
-        Methods.put("ActionTryPerformLongClickCurrentNode", objAction("ActionTryPerformLongClickCurrentNode"));
-        Methods.put("ActionTryRemoveSelectedNodeRectangle", objAction("ActionTryRemoveSelectedNodeRectangle"));
-        Methods.put("InputIsGestureCursor", objAction("InputIsGestureCursor"));
-        Methods.put("MetaIsDisabled", objAction("MetaIsDisabled"));
-        Methods.put("ActionTryDisableGestureCursorModeUnHoldState", objAction("ActionTryDisableGestureCursorModeUnHoldState"));
-        Methods.put("ActionTryEnableGestureCursorModeOnHoldState", objAction("ActionTryEnableGestureCursorModeOnHoldState"));
-        Methods.put("ActionDeletePrevWord", objAction("ActionDeletePrevWord"));
-        Methods.put("MetaIsKey0Pressed", objAction("MetaIsKey0Pressed"));
-        Methods.put("ActionSendCharFromAltPopup", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharFromAltPopup(p); } }, KeyPressData.class));
-        Methods.put("ActionSendCharFromAltPopupAtSingleAltTriplePress", InitializeMethod3(new IActionMethod<KeyPressData>() { public boolean invoke(KeyPressData p) { return ActionSendCharFromAltPopupAtSingleAltTriplePress(p); } }, KeyPressData.class));
-        Methods.put("ActionSendEnterOrCustomButton", objAction("ActionSendEnterOrCustomButton"));
+        Methods.put("ActionSetKeyTransparency", InitializeMethod3((Object o) -> ActionSetKeyTransparency(), Object.class));
+        Methods.put("ActionToggleTransparencyMode", InitializeMethod3((Object o) -> ActionToggleTransparencyMode(), Object.class));
+        Methods.put("InputIsInputFieldAndEnteredText", InitializeMethod3((Object o) -> InputIsInputFieldAndEnteredText(), Object.class));
+        Methods.put("PrefEnsureEnteredText", InitializeMethod3((Object o) -> PrefEnsureEnteredText(), Object.class));
+        Methods.put("InputIsDigitsPad", InitializeMethod3((Object o) -> InputIsDigitsPad(), Object.class));
+        Methods.put("ActionResetDigitsHack", InitializeMethod3((Object o) -> ActionResetDigitsHack(), Object.class));
+        Methods.put("ActionTryChangeGesturePointerModeAtViewMode", InitializeMethod3((Object o) -> ActionTryChangeGesturePointerModeAtViewMode(), Object.class));
+        Methods.put("ActionTryChangeGestureModeStateAtInputMode", InitializeMethod3((Object o) -> ActionTryChangeGestureModeStateAtInputMode(), Object.class));
+        Methods.put("ActionResetGesturePointerMode", InitializeMethod3((Object o) -> ActionResetGesturePointerMode(), Object.class));
+        Methods.put("ActionTryChangeGestureInputScrollMode", InitializeMethod3((Object o) -> ActionTryChangeGestureInputScrollMode(), Object.class));
+        Methods.put("ActionTryDisableGestureInputScrollMode", InitializeMethod3((Object o) -> ActionTryDisableGestureInputScrollMode(), Object.class));
+        Methods.put("MetaIsViewMode", InitializeMethod3((Object o) -> MetaIsViewMode(), Object.class));
+        Methods.put("ActionTryPerformClickCurrentNode", InitializeMethod3((Object o) -> ActionTryPerformClickCurrentNode(), Object.class));
+        Methods.put("ActionTryPerformLongClickCurrentNode", InitializeMethod3((Object o) -> ActionTryPerformLongClickCurrentNode(), Object.class));
+        Methods.put("ActionTryRemoveSelectedNodeRectangle", InitializeMethod3((Object o) -> ActionTryRemoveSelectedNodeRectangle(), Object.class));
+        Methods.put("InputIsGestureCursor", InitializeMethod3((Object o) -> InputIsGestureCursor(), Object.class));
+        Methods.put("MetaIsDisabled", InitializeMethod3((Object o) -> MetaIsDisabled(), Object.class));
+        Methods.put("ActionTryDisableGestureCursorModeUnHoldState", InitializeMethod3((Object o) -> ActionTryDisableGestureCursorModeUnHoldState(), Object.class));
+        Methods.put("ActionTryEnableGestureCursorModeOnHoldState", InitializeMethod3((Object o) -> ActionTryEnableGestureCursorModeOnHoldState(), Object.class));
+        Methods.put("ActionDeletePrevWord", InitializeMethod3((Object o) -> ActionDeletePrevWord(), Object.class));
+        Methods.put("MetaIsKey0Pressed", InitializeMethod3((Object o) -> MetaIsKey0Pressed(), Object.class));
+        Methods.put("ActionSendCharFromAltPopup", InitializeMethod3(this::ActionSendCharFromAltPopup, KeyPressData.class));
+        Methods.put("ActionSendCharFromAltPopupAtSingleAltTriplePress", InitializeMethod3(this::ActionSendCharFromAltPopupAtSingleAltTriplePress, KeyPressData.class));
+        Methods.put("ActionSendEnterOrCustomButton", InitializeMethod3((Object o) -> ActionSendEnterOrCustomButton(), Object.class));
         //2.5
-        Methods.put("ActionTryResetHoldCtrlMode", objAction("ActionTryResetHoldCtrlMode"));
+        Methods.put("ActionTryResetHoldCtrlMode", InitializeMethod3((Object o) -> ActionTryResetHoldCtrlMode(), Object.class));
         //2.6
-        Methods.put("ActionDisableFirstSymbolAltMode", objAction("ActionDisableFirstSymbolAltMode"));
+        Methods.put("ActionDisableFirstSymbolAltMode", InitializeMethod3((Object o) -> ActionDisableFirstSymbolAltMode(), Object.class));
 
-        Methods.put("ActionStartVoiceListening", objAction("ActionStartVoiceListening"));
-        Methods.put("ActionChangeBackKeyboardLayout", objAction("ActionChangeBackKeyboardLayout"));
-        Methods.put("ActionWait300", objAction("ActionWait300"));
-        Methods.put("ActionDeleteFwdWord", objAction("ActionDeleteFwdWord"));
-        Methods.put("ActionDeleteUntilFwdCrLf", objAction("ActionDeleteUntilFwdCrLf"));
-        Methods.put("ActionTryEnableGestureInputScrollMode", objAction("ActionTryEnableGestureInputScrollMode"));
-        Methods.put("MetaIsSymPressed", objAction("MetaIsSymPressed"));
-        Methods.put("ActionEnableHoldSymMode", objAction("ActionEnableHoldSymMode"));
-        Methods.put("ActionDisableHoldSymMode", objAction("ActionDisableHoldSymMode"));
-        Methods.put("TryDoTelegramRightDialogueExitHack", objAction("TryDoTelegramRightDialogueExitHack"));
-        Methods.put("TryChangeSelectionStartDirection", objAction("TryChangeSelectionStartDirection"));
+        Methods.put("ActionStartVoiceListening", InitializeMethod3((Object o) -> ActionStartVoiceListening(), Object.class));
+        Methods.put("ActionChangeBackKeyboardLayout", InitializeMethod3((Object o) -> ActionChangeBackKeyboardLayout(), Object.class));
+        Methods.put("ActionWait300", InitializeMethod3((Object o) -> ActionWait300(), Object.class));
+        Methods.put("ActionDeleteFwdWord", InitializeMethod3((Object o) -> ActionDeleteFwdWord(), Object.class));
+        Methods.put("ActionDeleteUntilFwdCrLf", InitializeMethod3((Object o) -> ActionDeleteUntilFwdCrLf(), Object.class));
+        Methods.put("ActionTryEnableGestureInputScrollMode", InitializeMethod3((Object o) -> ActionTryEnableGestureInputScrollMode(), Object.class));
+        Methods.put("MetaIsSymPressed", InitializeMethod3((Object o) -> MetaIsSymPressed(), Object.class));
+        Methods.put("ActionEnableHoldSymMode", InitializeMethod3((Object o) -> ActionEnableHoldSymMode(), Object.class));
+        Methods.put("ActionDisableHoldSymMode", InitializeMethod3((Object o) -> ActionDisableHoldSymMode(), Object.class));
+        Methods.put("TryDoTelegramRightDialogueExitHack", InitializeMethod3((Object o) -> TryDoTelegramRightDialogueExitHack(), Object.class));
+        Methods.put("TryChangeSelectionStartDirection", InitializeMethod3((Object o) -> TryChangeSelectionStartDirection(), Object.class));
 
         //2.7
-        Methods.put("ActionPasteTextFromClipboardByLetters", objAction("ActionPasteTextFromClipboardByLetters"));
-        Methods.put("ActionMoveCursorPrevWord", InitializeMethod3(new IActionMethod<KeyEvent>() { public boolean invoke(KeyEvent p) { return ActionMoveCursorPrevWord(p); } }, KeyEvent.class));
-        Methods.put("ActionMoveCursorFwdWord", InitializeMethod3(new IActionMethod<KeyEvent>() { public boolean invoke(KeyEvent p) { return ActionMoveCursorFwdWord(p); } }, KeyEvent.class));
-        Methods.put("ActionSendNavKey", InitializeMethod3(new IActionMethod<NavActionData>() { public boolean invoke(NavActionData p) { return ActionSendNavKey(p); } }, NavActionData.class));
+        Methods.put("ActionPasteTextFromClipboardByLetters", InitializeMethod3((Object o) -> ActionPasteTextFromClipboardByLetters(), Object.class));
+        Methods.put("ActionMoveCursorPrevWord", InitializeMethod3(this::ActionMoveCursorPrevWord, KeyEvent.class));
+        Methods.put("ActionMoveCursorFwdWord", InitializeMethod3(this::ActionMoveCursorFwdWord, KeyEvent.class));
+        Methods.put("ActionSendNavKey", InitializeMethod3(this::ActionSendNavKey, NavActionData.class));
 
-        Methods.put("ActionToggleTranslationMode", objActionKeyPress("ActionToggleTranslationMode"));
-        Methods.put("ActionTogglePredictionBar", objActionKeyPress("ActionTogglePredictionBar"));
+        Methods.put("ActionToggleTranslationMode", InitializeMethod3(this::ActionToggleTranslationMode, KeyPressData.class));
+        Methods.put("ActionTogglePredictionBar", InitializeMethod3(this::ActionTogglePredictionBar, KeyPressData.class));
 
 
 

@@ -24,7 +24,7 @@ android {
         disable 'ExpiredTargetSdkVersion'
     }
 
-    compileSdkVersion 28
+    compileSdkVersion 30
 
     aaptOptions {
         noCompress '.cdb'
@@ -86,6 +86,7 @@ android {
     }
 
     compileOptions {
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -104,6 +105,7 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.8.7'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.0'
     //implementation 'com.pes.materialcolorpicker:library:1.2.5'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.2.3'
     implementation 'com.faendir.rhino:rhino-android:1.6.0'
     //implementation "com.github.yukuku:ambilwarna:2.0.1" // source included in project
     //implementation "com.github.skydoves:colorpickerview:2.3.0"
