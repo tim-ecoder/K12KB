@@ -10,6 +10,8 @@ import android.graphics.drawable.Icon;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Vibrator;
 import androidx.annotation.Keep;
 import androidx.annotation.RequiresApi;
@@ -45,6 +47,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
 
 
     public static K12KbIME Instance;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public String TITLE_NAV_TEXT;
     public String TITLE_NAV_FV_TEXT;
@@ -101,7 +104,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
     @RequiresApi(api = Build.VERSION_CODES.O)
     @SuppressLint({"ClickableViewAccessibility", "InflateParams"})
     @Override
-    public synchronized void onCreate() {
+    public void onCreate() {
 
         String STEP = "init";
         try {
@@ -352,7 +355,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
 
 
     @Override
-    public synchronized void onStartInput(EditorInfo editorInfo, boolean restarting) {
+    public void onStartInput(EditorInfo editorInfo, boolean restarting) {
         //TODO: Минорно. Если надо знать какие флаги их надо расшифровывать
         Log.d(TAG2, "onStartInput restarting="+restarting+
                 " package: " + editorInfo.packageName
@@ -379,6 +382,26 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
             _currentAppTransparency = GetTransparencyForCurrentApp();
 
         }
+
+        // Defer heavy work (requestShowSelf IPC, prediction init, action chains)
+        // so the main thread can process key events between frames
+        mainHandler.post(() -> {
+            try {
+                onStartInputDeferred(editorInfo);
+            } catch (Throwable ex) {
+                Log.e(TAG2, "onStartInput deferred exception: " + ex);
+            }
+        });
+
+        } catch(Throwable ex) {
+            Log.e(TAG2, "onStartInput exception: "+ex);
+            FileJsonUtils.LogErrorToGui("onStartInput exception: "+ex);
+        }
+    }
+
+    private void onStartInputDeferred(EditorInfo editorInfo) {
+        if(isNotStarted)
+            return;
 
         //Это нужно чтобы показать клаву (перейти в режим редактирования)
         if (pref_show_default_onscreen_keyboard
@@ -411,10 +434,6 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
             UpdateGestureModeVisualization();
         needUpdateGestureNotificationInsideSingleEvent = false;
         isPackageChangedInsideSingleEvent = false;
-        } catch(Throwable ex) {
-            Log.e(TAG2, "onStartInput exception: "+ex);
-            FileJsonUtils.LogErrorToGui("onStartInput exception: "+ex);
-        }
     }
 
     @Override
@@ -451,9 +470,8 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
                 //setCandidatesViewShown(false);
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                this.requestHideSelf(InputMethodManager.HIDE_NOT_ALWAYS);
-            }
+            // requestHideSelf removed: system handles hide on input finish,
+            // extra call creates redundant IPC
         } catch(Throwable ex) {
             Log.e(TAG2, "onFinishInput exception: "+ex);
             FileJsonUtils.LogErrorToGui("onFinishInput exception: "+ex);
@@ -473,7 +491,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
-    public synchronized boolean onKeyDown(int keyCode, KeyEvent event) {
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
         if(isNotStarted)
             return false;
         keyboardView.hidePopup(false);
@@ -534,7 +552,7 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
 
 
     @Override
-    public synchronized boolean onKeyUp(int keyCode, KeyEvent event) {
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
         Log.v(TAG2, "onKeyUp " + event);
         if(isNotStarted)
             return false;
@@ -1089,18 +1107,27 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         }
     }
 
+    private boolean hideRequested = false;
+
     @SuppressLint("ClickableViewAccessibility")
     protected void HideKeyboard() {
         keyboardView.setOnTouchListener(null);
         if (keyboardView.getVisibility() == View.VISIBLE) {
             keyboardView.setVisibility(View.GONE);
         }
-        this.hideWindow();
-
+        if (!hideRequested) {
+            hideRequested = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                this.requestHideSelf(InputMethodManager.HIDE_NOT_ALWAYS);
+            } else {
+                this.hideWindow();
+            }
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
     protected void ShowKeyboard() {
+        hideRequested = false;
         keyboardView.setOnTouchListener(this);
         if (keyboardView.getVisibility() != View.VISIBLE)
             keyboardView.setVisibility(View.VISIBLE);

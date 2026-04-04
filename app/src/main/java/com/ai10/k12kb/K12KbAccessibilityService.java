@@ -6,6 +6,8 @@ import android.accessibilityservice.GestureDescription;
 import android.content.Context;
 import android.graphics.*;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -41,6 +43,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
     public final ArrayList<SearchClickPlugin> clickerPlugins = new ArrayList<>();
 
     K12KbSettings k12KbSettings;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     //ExecutorService executorService;
 
@@ -141,7 +144,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
             }
     }
     @Override
-    public synchronized void onDestroy() {
+    public void onDestroy() {
         Log.v(TAG3, "onDestroy()");
         Instance = null;
         super.onDestroy();
@@ -151,7 +154,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
     WindowManager.LayoutParams _layoutParams;
 
     @Override
-    public synchronized void onCreate() {
+    public void onCreate() {
         Log.v(TAG3, "onCreate()");
         try {
             FileJsonUtils.Initialize(this);
@@ -182,15 +185,25 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
     public AccessibilityNodeInfo CurFocus;
 
+    private long lastAccessibilityEventTime = 0;
+    private static final long ACCESSIBILITY_THROTTLE_MS = 80;
+
     @Override
-    public synchronized void onAccessibilityEvent(AccessibilityEvent event) {
+    public void onAccessibilityEvent(AccessibilityEvent event) {
         //Log.v(TAG3, "onAccessibilityEvent() eventType: "+event.getEventType() +" "+event.getPackageName());
 
         try {
             if(K12KbIME.Instance == null)
                 return;
 
-
+            // Throttle: skip rapid-fire events to keep main thread free for key events
+            // Always process TYPE_WINDOW_STATE_CHANGED (app switches) immediately
+            if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                long now = SystemClock.uptimeMillis();
+                if (now - lastAccessibilityEventTime < ACCESSIBILITY_THROTTLE_MS)
+                    return;
+                lastAccessibilityEventTime = now;
+            }
 
             if (
                     event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
@@ -449,12 +462,17 @@ public class K12KbAccessibilityService extends AccessibilityService {
             return info;
         }
 
-        AccessibilityNodeInfo info1 = FindFocusedRecurs(info);
+        // Use framework findFocus() — single IPC call instead of
+        // recursive tree traversal with thousands of getChild() IPC calls
+        AccessibilityNodeInfo info1 = info.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+        if (info1 == null) {
+            info1 = info.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY);
+        }
         if(info1 != null) {
-            Log.d(TAG3, "FindFocusedRecurs FOUND HASH: "+info1.hashCode());
+            Log.d(TAG3, "GetFocusedNode findFocus FOUND HASH: "+info1.hashCode());
             return info1;
         } else {
-            Log.d(TAG3, "FindFocusedRecurs NOT FOUND");
+            Log.d(TAG3, "GetFocusedNode findFocus NOT FOUND");
             return null;
         }
     }
@@ -1049,8 +1067,11 @@ public class K12KbAccessibilityService extends AccessibilityService {
     }
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
-    public synchronized boolean onKeyEvent(KeyEvent event) {
-        Log.v(TAG3, "onKeyEvent() "+event);
+    public boolean onKeyEvent(KeyEvent event) {
+        // Fast-path: never intercept system navigation keys — minimize IPC latency
+        int kc = event.getKeyCode();
+        if (kc == KeyEvent.KEYCODE_HOME || kc == KeyEvent.KEYCODE_APP_SWITCH)
+            return false;
 
         if (K12KbIME.Instance == null)
             return false;
