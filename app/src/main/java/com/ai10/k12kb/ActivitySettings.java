@@ -474,6 +474,7 @@ public class ActivitySettings extends Activity {
             {R.id.switch_pointer_mode_rect, R.string.pref_p_13_hint},
             {R.id.button_pointer_mode_rect_color_picker, R.string.pref_p_13a_hint},
             {R.id.switch_p14_nav_pad_on_hold, R.string.pref_p_14_hint},
+            {R.id.switch_transparency_mode, R.string.pref_transparency_mode_hint},
         });
 
     }

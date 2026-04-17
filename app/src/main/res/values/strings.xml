@@ -43,7 +43,7 @@ For more utilities for working with Capital letters, see the Manual in chapter B
     <string name="pref_p_6_hint">Answer call: Key1|2 2хSpace; Pocket|Slim: 1xShift;\nDecline/End call: Key1|2 2хSYM Pocket|Slim: 1xAlt.</string>
     <string name="pref_auto_capitalization">28. Auto-capitalization</string>
     <string name="pref_transparency_mode">29. Transparency mode (global)</string>
-    <string name="pref_transparency_mode_hint">Keys pass through to app in view mode. Per-app: Alt+Sym</string>
+    <string name="pref_transparency_mode_hint">Keys pass through to the app in view mode. Per-app transparency can be toggled with Alt+Sym and is remembered in settings per package.</string>
     <string name="pref_p_7_name">7. Bottom swipe-panel height:</string>
     <string name="pref_p_7_value">Less | More</string>
     <string name="pref_p_8_name">8. Enable on-screen swipe-panel</string>
