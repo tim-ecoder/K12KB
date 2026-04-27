@@ -1065,6 +1065,8 @@ public class K12KbAccessibilityService extends AccessibilityService {
             }
         }
     }
+    private long lastBackResendUptime = 0;
+
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public boolean onKeyEvent(KeyEvent event) {
@@ -1072,6 +1074,38 @@ public class K12KbAccessibilityService extends AccessibilityService {
         int kc = event.getKeyCode();
         if (kc == KeyEvent.KEYCODE_HOME || kc == KeyEvent.KEYCODE_APP_SWITCH)
             return false;
+
+        // Android 16 BACK workaround: when IME has visible UI, framework's
+        // OnBackInvokedCallback either hides IME (1st press) and only navigates on
+        // 2nd press, or with WILL_NOT_DISMISS does nothing at all. We want 1-press
+        // BACK to navigate. Strategy: hide IME panels ourselves, then re-fire BACK.
+        if (Build.VERSION.SDK_INT >= 36
+                && kc == KeyEvent.KEYCODE_BACK
+                && K12KbIME.Instance != null
+                && K12KbIME.Instance.IsInputMode()) {
+            long now = android.os.SystemClock.uptimeMillis();
+            // Let our own re-injected BACK pass through (within 250ms window)
+            if (now - lastBackResendUptime < 250) {
+                return false;
+            }
+            if (event.getAction() == KeyEvent.ACTION_DOWN
+                    && event.getRepeatCount() == 0) {
+                lastBackResendUptime = now;
+                // 1) Hide IME panels (so framework no longer registers a back callback)
+                try {
+                    K12KbIME.Instance.requestHideSelf(0);
+                } catch (Throwable ignored) {}
+                // 2) After IME finishes hiding, re-fire BACK so it navigates the app
+                mainHandler.postDelayed(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            performGlobalAction(GLOBAL_ACTION_BACK);
+                        } catch (Throwable ignored) {}
+                    }
+                }, 120);
+            }
+            return true; // consume DOWN and UP of the original BACK
+        }
 
         if (K12KbIME.Instance == null)
             return false;
