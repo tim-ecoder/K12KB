@@ -364,14 +364,6 @@
           "meta-mode-method-names": [
             "MetaIsCtrlPressed"
           ],
-          "action-method-name": "ActionToggleTranslationMode",
-          "method-needs-key-press-parameter": true,
-          "stop-processing-at-success-result": true
-        },
-        {
-          "meta-mode-method-names": [
-            "MetaIsCtrlPressed"
-          ],
           "action-method-name": "ActionSendCtrlPlusKey",
           "method-needs-key-press-parameter": true,
           "stop-processing-at-success-result": true
