@@ -2197,6 +2197,29 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
         return IsInputMode();
     }
 
+    /**
+     * Режим ввода «по-настоящему»: поле не просто привязано, но клавиатура и
+     * правда на экране.
+     *
+     * Телеграм при выходе из чата возвращает привязку поля сообщения через
+     * четверть секунды после onFinishInput, хотя пользователь уже смотрит на
+     * список чатов. По IsInputMode() это неотличимо от набора текста, и плагин
+     * поиска гасился ровно там, где он и нужен.
+     *
+     * Различать помогает окно клавиатуры — но только при включённой панели
+     * (настройка 8): тогда в режиме ввода панель всегда на экране, а в списке
+     * чатов её нет. При выключенной панели окно не показывается и во время
+     * набора с аппаратной клавиатуры, поэтому там опираться на него нельзя —
+     * остаётся прежнее условие.
+     */
+    public boolean IsActiveInputMode() {
+        if (!IsInputMode())
+            return false;
+        if (!pref_show_default_onscreen_keyboard)
+            return true;
+        return isInputViewShown();
+    }
+
     public boolean MetaIsViewMode() {
         return !IsInputMode();
     }
@@ -2271,8 +2294,11 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
     //
     public boolean TryDoTelegramRightDialogueExitHack() {
         //На случай модификацией-клонов телеграмма, которые меняют последнюю букву пакета + .web
-        if(!_lastPackageName.contains("org.telegram.messenge"))
+        if(!_lastPackageName.contains("org.telegram.messenge")) {
+            Log.d(TAG2, "TelegramExitHack: не телеграм (" + _lastPackageName + ")");
             return false;
+        }
+        Log.d(TAG2, "TelegramExitHack: шлём TAB, чтобы сбить фокус с поля");
         keyDownUp(KeyEvent.KEYCODE_TAB, getCurrentInputConnection(), 0,KeyEvent.FLAG_SOFT_KEYBOARD | KeyEvent.FLAG_KEEP_TOUCH_MODE);
         return true;
     }
@@ -2334,7 +2360,7 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
     public void SetSearchHack(SearchClickPlugin.SearchPluginLauncher searchPluginLaunchData) {
         if(SearchPluginLauncher == null && searchPluginLaunchData == null)
             return;
-        if(IsInputMode() && searchPluginLaunchData != null) {
+        if(IsActiveInputMode() && searchPluginLaunchData != null) {
             // isInputViewShown() убран из условия. Он стоял тут как признак
             // "пользователь уже в поле ввода": раньше окно клавиатуры показывалось
             // только в режиме ввода, поэтому одно следовало из другого. Показ в

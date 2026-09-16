@@ -438,7 +438,34 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
     /** Android 14: Build.VERSION_CODES.UPSIDE_DOWN_CAKE, которого нет в compileSdk 30. */
     private static final int ANDROID_14_CLEARS_FIELD_ID = 34;
 
+    /**
+     * Ввод уже завершается: мы внутри onFinishInput.
+     *
+     * Снимать признак ввода по состоянию самого IMS в этот момент нельзя.
+     * InputMethodService.doFinishInput() ставит mInputStarted = false ПОСЛЕ
+     * вызова onFinishInput() (AOSP, android-16.0.0_r4,
+     * InputMethodService.java:3359-3364), поэтому внутри нашего обработчика
+     * getCurrentInputStarted() ещё true, а getCurrentInputEditorInfo() держит
+     * EditorInfo закрываемого поля — IsInputMode() отдаёт true для уже мёртвой
+     * привязки.
+     *
+     * Ценой этого была живучая ошибка: UpdateKeyboardModeVisualization,
+     * вызываемая из onFinishInput, видела этот протухший true и поднимала
+     * панель обратно через ShowKeyboard() -> showWindow(true). Окно IME
+     * вставало ровно в момент разрыва сессии, система перезапускала ввод на
+     * той же View, и Телеграм через три миллисекунды привязывал поле сообщения
+     * назад — уже поверх списка чатов. Панель оставалась висеть, а плагин
+     * поиска гас по IsActiveInputMode().
+     */
+    private boolean inputFinishing = false;
+
+    /** Ввод завершается — с этого момента и до следующего onStartInput режима ввода нет. */
+    protected void SetInputFinishing(boolean value) {
+        inputFinishing = value;
+    }
+
     protected boolean IsInputMode() {
+        if (inputFinishing) return false;
         if (!getCurrentInputStarted()) return false;
         if (getCurrentInputConnection() == null) return false;
         EditorInfo ei = getCurrentInputEditorInfo();

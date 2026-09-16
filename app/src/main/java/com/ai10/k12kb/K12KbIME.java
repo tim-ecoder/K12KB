@@ -386,6 +386,17 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         Log.d(TAG2, "onFinishInputView");
         super.onFinishInputView(finishingInput);
         IsVisualKeyboardOpen = false;
+        RunAfterInputViewHidden();
+
+        // Приложение убрало окно клавиатуры — приводим свою сторону в то же
+        // состояние. Раньше мы не делали ничего: keyboardView оставался VISIBLE,
+        // hideRequested — false, окно мы не отпускали. Телеграм в это время
+        // просит скрыть клавиатуру и закрыть сессию, но пока окно держится,
+        // закрыть её не может: onFinishInput приходил через полторы секунды, а
+        // состояние оставалось рассогласованным — isInputViewShown() и isShown()
+        // отдавали true при пустом touchableRegion, и на следующем входе в чат
+        // ShowKeyboard() уже ничего не делал, панель не появлялась.
+        HideKeyboard();
     }
 
 
@@ -399,6 +410,8 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
                 +" editorInfo.fieldId: "+editorInfo.fieldId);
         if(isNotStarted)
             return;
+        // Привязка новая — признак завершения ввода снимаем.
+        SetInputFinishing(false);
         try {
         super.onStartInput(editorInfo, restarting);
         if(restarting)
@@ -439,11 +452,20 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         if(isNotStarted)
             return;
 
+
         //Это нужно чтобы показать клаву (перейти в режим редактирования)
         // Признак — привязанный редактор, а не inputType > 0: терминалы (Termux)
         // ставят TYPE_NULL, и по inputType они выглядели как "поля нет".
+        // На isInputViewShown() опираться нельзя: он отдаёт состояние самого
+        // IMS, а оно расходится с системным. В Телеграме на втором входе в чат
+        // видно mIsInputViewShown=true при mInputShown=false и пустом
+        // touchableRegion — окно формально «показано», занимает ноль пикселей, и
+        // просить показ было некому: ветка с этим условием не выполнялась, а
+        // ShowKeyboard пропускал showWindow(true), потому что isShown() тоже
+        // отдавал true. Панель не появлялась до тапа по полю.
+        //
+        // Повторный запрос, когда окно и правда видно, системе ничего не стоит.
         if (pref_show_default_onscreen_keyboard
-                && !isInputViewShown()
                 && IsInputMode()
                 && Orientation == 1) {
             keyboardView.setOnTouchListener(this);
@@ -454,7 +476,19 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
             }
         } else if (!pref_show_default_onscreen_keyboard
                 && wordPredictor != null
-                && IsInputMode()) {
+                && IsInputMode()
+                && !(predictionBarHiddenByDefault && !predictionBarVisibleThisSession)) {
+            // Окно IME открывается только ради панели предсказаний, поэтому
+            // просить показ, когда панель скрыта, незачем.
+            //
+            // Это не оптимизация, а исправление: запрос уходил на каждый
+            // onStartInput, в том числе когда приложение только что попросило
+            // клавиатуру убрать. Телеграм при выходе из диалога шлёт
+            // HIDE_SOFT_INPUT, затем HIDE_SOFT_INPUT_FROM_VIEW и
+            // HIDE_SOFT_INPUT_CLOSE_CURRENT_SESSION, а наш показ между ними не
+            // давал сессии закрыться: onFinishInput не приходил, привязка
+            // оставалась, и плагин поиска оставался выключенным по IsInputMode().
+            // Без запроса Телеграм закрывает ввод сам, и плагин заряжается.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 this.requestShowSelf(InputMethodManager.SHOW_IMPLICIT);
             }
@@ -477,6 +511,8 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         Log.d(TAG2, "onFinishInput ");
         if(isNotStarted)
             return;
+        // До конца разбора этого события режима ввода нет: см. SetInputFinishing.
+        SetInputFinishing(true);
         super.onFinishInput();
 
         try {
@@ -1065,10 +1101,58 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
         }
     }
 
+    /**
+     * Дело, которое ждёт, пока окно IME действительно уберут.
+     *
+     * Скрытие панели асинхронно: между запросом и фактическим закрытием в
+     * трассе проходило 331 мс (запрос 19.701 — onFinishInputView 20.032), и это
+     * анимация WindowManager, а не наша задержка. Ждать её фиксированным
+     * таймером нельзя — Back-обход ждал 120 мс и перевыпускал BACK, когда
+     * панель была ещё в середине анимации.
+     */
+    private Runnable afterInputViewHidden = null;
+
+    /**
+     * Выполнить дело, когда окно IME будет убрано.
+     *
+     * Если окна и так нет, ждать нечего — выполняем сразу: скрывать нечего,
+     * значит onFinishInputView не придёт и ждать его пришлось бы вечно.
+     */
+    public void RunWhenInputViewHidden(Runnable action) {
+        if (action == null)
+            return;
+        if (!isInputViewShown()) {
+            Log.d(TAG2, "ПАНЕЛЬ: окно уже убрано, выполняем сразу");
+            action.run();
+            return;
+        }
+        afterInputViewHidden = action;
+    }
+
+    /** Окно убрано — выполнить отложенное дело, если оно есть. */
+    private void RunAfterInputViewHidden() {
+        Runnable action = afterInputViewHidden;
+        if (action == null)
+            return;
+        afterInputViewHidden = null;
+        Log.d(TAG2, "ПАНЕЛЬ: окно убрано, выполняем отложенное дело");
+        action.run();
+    }
+
+    /** Отложенное дело больше не нужно (сработала подстраховка по таймеру). */
+    public void CancelWhenInputViewHidden() {
+        afterInputViewHidden = null;
+    }
+
     private boolean hideRequested = false;
 
     @SuppressLint("ClickableViewAccessibility")
     protected void HideKeyboard() {
+        Log.d(TAG2, "ПАНЕЛЬ: HideKeyboard visibility=" + keyboardView.getVisibility()
+                + " isShown=" + keyboardView.isShown()
+                + " hideRequested=" + hideRequested
+                + " inputViewShown=" + isInputViewShown()
+                               + " IsInputMode=" + IsInputMode());
         keyboardView.setOnTouchListener(null);
         if (keyboardView.getVisibility() == View.VISIBLE) {
             keyboardView.setVisibility(View.GONE);
@@ -1085,6 +1169,11 @@ public class K12KbIME extends InputMethodServiceCoreCustomizable implements Keyb
 
     @SuppressLint("ClickableViewAccessibility")
     protected void ShowKeyboard() {
+        Log.d(TAG2, "ПАНЕЛЬ: ShowKeyboard visibility=" + keyboardView.getVisibility()
+                + " isShown=" + keyboardView.isShown()
+                + " hideRequested=" + hideRequested
+                + " inputViewShown=" + isInputViewShown()
+                               + " IsInputMode=" + IsInputMode());
         hideRequested = false;
         keyboardView.setOnTouchListener(this);
         if (keyboardView.getVisibility() != View.VISIBLE)

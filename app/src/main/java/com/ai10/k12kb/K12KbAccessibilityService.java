@@ -1008,8 +1008,8 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
     private void ProcessSearchPlugins(AccessibilityEvent event) {
 
-        if(K12KbIME.Instance != null && K12KbIME.Instance.IsInputMode()) {
-            Log.d(TAG3, "ProcessSearchPlugins:K12KbIME.Instance.IsInputMode()");
+        if(K12KbIME.Instance != null && K12KbIME.Instance.IsActiveInputMode()) {
+            Log.d(TAG3, "ProcessSearchPlugins:K12KbIME.Instance.IsActiveInputMode()");
             // Отложенный поиск обязан быть снят вместе с хаком, иначе он
             // выстрелит уже в режиме ввода и поставит хак заново.
             CancelPendingSearch();
@@ -1489,6 +1489,19 @@ public class K12KbAccessibilityService extends AccessibilityService {
         }
     }
     private long lastBackResendUptime = 0;
+    /** Ждём ли сейчас закрытия панели, чтобы перевыпустить BACK. */
+    private boolean backResendPending = false;
+    /**
+     * Подстраховка на случай, если скрытие панели не завершится.
+     *
+     * В трассе видно, что такое бывает: запрос скрытия заканчивался
+     * "onFailed at PHASE_WM_NOTIFY_HIDE_ANIMATION_FINISHED". Без подстраховки
+     * BACK в этом случае пропал бы совсем. Срок взят с запасом к измеренным
+     * 331 мс фактического скрытия и снимается, как только приходит настоящее
+     * onFinishInputView.
+     */
+    private static final long BACK_RESEND_FALLBACK_MS = 700;
+    private Runnable backResendFallback = null;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
@@ -1507,25 +1520,48 @@ public class K12KbAccessibilityService extends AccessibilityService {
                 && K12KbIME.Instance != null
                 && K12KbIME.Instance.IsInputMode()) {
             long now = android.os.SystemClock.uptimeMillis();
-            // Let our own re-injected BACK pass through (within 250ms window)
+            // Let our own re-injected BACK pass through (within 250ms window).
+            // Отсчёт идёт от момента перевыпуска, а не от нажатия: скрытие
+            // панели занимает сотни миллисекунд, и от нажатия наш же BACK в
+            // это окно уже не попадал бы — мы перехватили бы его снова.
             if (now - lastBackResendUptime < 250) {
                 return false;
             }
             if (event.getAction() == KeyEvent.ACTION_DOWN
-                    && event.getRepeatCount() == 0) {
-                lastBackResendUptime = now;
+                    && event.getRepeatCount() == 0
+                    && !backResendPending) {
+                backResendPending = true;
                 // 1) Hide IME panels (so framework no longer registers a back callback)
                 try {
                     K12KbIME.Instance.requestHideSelf(0);
                 } catch (Throwable ignored) {}
-                // 2) After IME finishes hiding, re-fire BACK so it navigates the app
-                mainHandler.postDelayed(new Runnable() {
+                // 2) Перевыпустить BACK, когда панель ДЕЙСТВИТЕЛЬНО убрана.
+                // Раньше тут стоял postDelayed(120), а фактическое скрытие по
+                // трассе занимает 331 мс: приложение получало навигацию поверх
+                // ещё не закрытого IME. Момент закрытия известен точно — это
+                // onFinishInputView, по нему и работаем.
+                final Runnable resendBack = new Runnable() {
                     @Override public void run() {
+                        if (!backResendPending)
+                            return;
+                        backResendPending = false;
+                        mainHandler.removeCallbacks(backResendFallback);
+                        try {
+                            K12KbIME.Instance.CancelWhenInputViewHidden();
+                        } catch (Throwable ignored) {}
+                        lastBackResendUptime = android.os.SystemClock.uptimeMillis();
                         try {
                             performGlobalAction(GLOBAL_ACTION_BACK);
                         } catch (Throwable ignored) {}
                     }
-                }, 120);
+                };
+                backResendFallback = resendBack;
+                mainHandler.postDelayed(resendBack, BACK_RESEND_FALLBACK_MS);
+                try {
+                    K12KbIME.Instance.RunWhenInputViewHidden(resendBack);
+                } catch (Throwable ignored) {
+                    resendBack.run();
+                }
             }
             return true; // consume DOWN and UP of the original BACK
         }
