@@ -881,6 +881,11 @@
           ],
           "action-method-name": "ActionDoNothing",
           "stop-processing-at-success-result": true
+        }, {
+        "meta-mode-method-names": [
+          "InputIsAnyInput"
+        ],
+        "action-method-name": "TryDoTelegramRightDialogueExitHack"
         }
       ],
       "on-double-press": [ {
