@@ -2293,6 +2293,15 @@ public abstract class InputMethodServiceCoreCustomizable extends InputMethodServ
 
     //
     public boolean TryDoTelegramRightDialogueExitHack() {
+        // Только при включённой свайп-панели. Без неё окно IME не показывается
+        // вовсе, Телеграм после выхода из чата закрывает ввод сам, привязка
+        // становится пустой и плагин поиска заряжается без посторонней помощи —
+        // проверено на трассах. Посылать TAB в эту ветку значило бы лезть в чужой
+        // фокус там, где всё и так работает.
+        if(!pref_show_default_onscreen_keyboard) {
+            Log.d(TAG2, "TelegramExitHack: панель выключена, TAB не нужен");
+            return false;
+        }
         //На случай модификацией-клонов телеграмма, которые меняют последнюю букву пакета + .web
         if(!_lastPackageName.contains("org.telegram.messenge")) {
             Log.d(TAG2, "TelegramExitHack: не телеграм (" + _lastPackageName + ")");
