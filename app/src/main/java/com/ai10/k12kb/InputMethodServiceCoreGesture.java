@@ -5,6 +5,7 @@ import androidx.annotation.RequiresApi;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedText;
@@ -480,6 +481,7 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
     private boolean MoveCursorDownSafe(InputConnection inputConnection, float lastGestureY, float currentGestureY, long time) {
         if(IsAnyGestureAtViewMode()) {
             keyDownUpMeta(KeyEvent.KEYCODE_DPAD_DOWN, inputConnection, 0);
+            PredictSelectionStep(View.FOCUS_DOWN);
             return true;
         }
         if(inputConnection.getSelectedText(0) == null) {
@@ -505,6 +507,7 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
     private boolean MoveCursorUpSafe(InputConnection inputConnection, float lastGestureY, float currentGestureY, long time) {
         if(IsAnyGestureAtViewMode()) {
             keyDownUpMeta(KeyEvent.KEYCODE_DPAD_UP, inputConnection, 0);
+            PredictSelectionStep(View.FOCUS_UP);
             return true;
         }
         if(inputConnection.getSelectedText(0) == null) {
@@ -530,6 +533,7 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
     protected boolean MoveCursorLeftSafe(InputConnection inputConnection) {
         if(IsAnyGestureAtViewMode()) {
             keyDownUpMeta(KeyEvent.KEYCODE_DPAD_LEFT, inputConnection, 0);
+            PredictSelectionStep(View.FOCUS_LEFT);
             return true;
         }
         if(IsInputMode() && _modeGestureScrollAtInputMode) {
@@ -558,6 +562,7 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
     protected boolean MoveCursorRightSafe(InputConnection inputConnection) {
         if(IsAnyGestureAtViewMode()) {
             keyDownUpMeta(KeyEvent.KEYCODE_DPAD_RIGHT, inputConnection, 0);
+            PredictSelectionStep(View.FOCUS_RIGHT);
             return true;
         }
         if(IsInputMode() && _modeGestureScrollAtInputMode) {
@@ -714,6 +719,21 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
      * Служба доступности подписывается на TYPE_WINDOW_CONTENT_CHANGED только когда
      * события кому-то нужны; смена режима курсора или навигации это меняет.
      */
+    /**
+     * Подсказать службе, куда сейчас уедет фокус, не дожидаясь события.
+     *
+     * Замер на .3 (28 шагов, лаунчер BlackBerry): событие о смене фокуса
+     * доезжает до нас через 25 мс после того, как его создало приложение,
+     * обработка занимает 2 мс, отрисовка ждёт ближайшего кадра — ещё 18 мс.
+     * Шаг курсора при этом делаем мы сами, посылая DPAD, поэтому направление
+     * известно раньше, чем приложение о нём сообщит.
+     */
+    protected void PredictSelectionStep(int viewFocusDirection) {
+        K12KbAccessibilityService as = K12KbAccessibilityService.Instance;
+        if (as != null)
+            as.PredictSelectionStep(viewFocusDirection);
+    }
+
     protected void RefreshAccessibilityEventSubscription() {
         K12KbAccessibilityService as = K12KbAccessibilityService.Instance;
         if (as != null)
@@ -821,6 +841,9 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
             _modeGestureAtViewMode = GestureAtViewMode.Pointer;
         Log.d(TAG2, "GESTURE_POINTER_MODE SET="+ _modeGestureAtViewMode);
         SetGestureDefaultPointerMode(_lastPackageName, _modeGestureAtViewMode);
+        // Подписка на contentChanged держится на самом режиме курсора, поэтому
+        // переключение Scroll<->Pointer её меняет.
+        RefreshAccessibilityEventSubscription();
         ResetGestureMovementCoordsToInitial();
         return true;
     }
@@ -839,6 +862,7 @@ public abstract class InputMethodServiceCoreGesture extends InputMethodServiceCo
         }
         _modeGestureAtViewMode = GetGestureStoredOrDefaultPointerMode();
         Log.d(TAG2, "GESTURE_POINTER_MODE SET="+ _modeGestureAtViewMode);
+        RefreshAccessibilityEventSubscription();
         ResetGestureMovementCoordsToInitial();
         return true;
     }
