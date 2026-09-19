@@ -10,6 +10,7 @@ import android.content.Context;
 import android.graphics.*;
 import android.os.Build;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
 import androidx.annotation.Nullable;
@@ -203,6 +204,12 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
     private long lastAccessibilityEventTime = 0;
     private static final long ACCESSIBILITY_THROTTLE_MS = 80;
+    /**
+     * Свой throttle в режиме курсора — на один кадр, а не на 80 мс. Рамка едет
+     * за фокусом по событиям прокрутки и изменения содержимого, и общие 80 мс
+     * роняли как раз их.
+     */
+    private static final long ACCESSIBILITY_THROTTLE_POINTER_MS = 16;
 
     /**
      * Типы событий, на которые служба подписана всегда. Дёшевы: приходят на смену
@@ -215,6 +222,20 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
     /** Набор типов, на который служба подписана прямо сейчас. */
     private int currentEventTypes = BASE_EVENT_TYPES;
+
+    /**
+     * Задержка доставки событий (AccessibilityServiceInfo.notificationTimeout).
+     *
+     * Фреймворк копит события одного типа и отдаёт службе только ПОСЛЕДНЕЕ, и
+     * то по истечении этого срока (AbstractAccessibilityServiceConnection,
+     * android-16.0.0_r4, строки 1832-1849). Со ста миллисекундами из манифеста
+     * быстрые шаги курсора склеивались: промежуточные события о смене фокуса
+     * не задерживались, а уничтожались.
+     */
+    private static final int NOTIFICATION_TIMEOUT_POINTER_MS = 0;
+    /** Прежнее значение из k12kb_accessibility_service_config.xml. */
+    private static final int NOTIFICATION_TIMEOUT_DEFAULT_MS = 100;
+    private int currentNotificationTimeout = NOTIFICATION_TIMEOUT_DEFAULT_MS;
     /** Пакет окна, которое сейчас на экране — по нему решаем, нужна ли подписка. */
     private String lastWindowPackage = "";
     /**
@@ -253,20 +274,26 @@ public class K12KbAccessibilityService extends AccessibilityService {
             int target;
             if (!ourImeSelected) {
                 target = 0;
-            } else if (NeedContentChangedEvents()) {
-                target = BASE_EVENT_TYPES | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
             } else {
                 target = BASE_EVENT_TYPES;
+                if (NeedContentChangedEvents())
+                    target |= AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
             }
-            if (target == currentEventTypes)
+            int targetTimeout = PointerRectActive()
+                    ? NOTIFICATION_TIMEOUT_POINTER_MS
+                    : NOTIFICATION_TIMEOUT_DEFAULT_MS;
+            if (target == currentEventTypes && targetTimeout == currentNotificationTimeout)
                 return;
             AccessibilityServiceInfo info = getServiceInfo();
             if (info == null)
                 return;
             info.eventTypes = target;
+            info.notificationTimeout = targetTimeout;
             setServiceInfo(info);
             currentEventTypes = target;
+            currentNotificationTimeout = targetTimeout;
             Log.d(TAG3, "eventTypes = 0x" + Integer.toHexString(target)
+                    + " timeout=" + targetTimeout
                     + " ourIme=" + ourImeSelected + " package=" + lastWindowPackage);
         } catch (Throwable ex) {
             Log.e(TAG3, "RefreshEventTypeSubscription: " + ex);
@@ -327,9 +354,35 @@ public class K12KbAccessibilityService extends AccessibilityService {
      * - плагину поиска или кликера, если текущий пакет вообще в их списке;
      * - digits-хаку, если для текущего пакета заведён маркер;
      * - навигационному режиму;
-     * - режиму курсора, но только когда узел уже выбран: пока его нет, новый
-     *   придёт с TYPE_VIEW_FOCUSED, на который мы подписаны всегда.
+     * - режиму курсора — всё время, пока он включён.
+     *
+     * Условия "пока узел выбран" (ime.CurrentNodeInfo != null) тут быть не
+     * может, хотя оно и выглядит экономнее. Выбранный узел сбрасывается на
+     * каждый чих: не нашли фокус в поддереве события, пришёл WINDOWS_CHANGED с
+     * windowId = -1, узел на мгновение отдал isFocused() = false. Все эти
+     * сбросы снимали подписку, а вернуть её мог только новый TYPE_VIEW_FOCUSED,
+     * то есть движение курсора пользователем. Рамка рисовалась и тут же
+     * пропадала до следующего шага курсора.
      */
+    /**
+     * Работает ли сейчас режим курсора или навигации, то есть нужна ли рамка.
+     *
+     * По этому признаку события доставляются без склейки и с коротким
+     * throttle: в остальное время спешка ни к чему, а склейка экономит работу.
+     */
+    private boolean PointerRectActive() {
+        if (k12KbAccServiceOptions == null)
+            return false;
+        K12KbIME ime = K12KbIME.Instance;
+        if (ime == null)
+            return false;
+        if (ime.IsNavMode())
+            return true;
+        return ime._modeGestureAtViewMode == InputMethodServiceCoreGesture.GestureAtViewMode.Pointer
+                && (k12KbAccServiceOptions.SelectedNodeClickHack
+                    || k12KbAccServiceOptions.SelectedNodeHighlight);
+    }
+
     private boolean NeedContentChangedEvents() {
         if (k12KbAccServiceOptions == null)
             return true;
@@ -346,8 +399,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
             return true;
         return ime._modeGestureAtViewMode == InputMethodServiceCoreGesture.GestureAtViewMode.Pointer
                 && (k12KbAccServiceOptions.SelectedNodeClickHack
-                    || k12KbAccServiceOptions.SelectedNodeHighlight)
-                && ime.CurrentNodeInfo != null;
+                    || k12KbAccServiceOptions.SelectedNodeHighlight);
     }
 
     // --- отрицательный кэш поиска поля ---
@@ -467,9 +519,15 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
             // Throttle: skip rapid-fire events to keep main thread free for key events
             // Always process TYPE_WINDOW_STATE_CHANGED (app switches) immediately
-            if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            // TYPE_VIEW_FOCUSED тоже не отбрасываем: это шаг курсора, и
+            // пропущенный шаг — то самое отставание рамки на элемент.
+            if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    && event.getEventType() != AccessibilityEvent.TYPE_VIEW_FOCUSED) {
                 long now = SystemClock.uptimeMillis();
-                if (now - lastAccessibilityEventTime < ACCESSIBILITY_THROTTLE_MS)
+                long throttle = PointerRectActive()
+                        ? ACCESSIBILITY_THROTTLE_POINTER_MS
+                        : ACCESSIBILITY_THROTTLE_MS;
+                if (now - lastAccessibilityEventTime < throttle)
                     return;
                 lastAccessibilityEventTime = now;
             }
@@ -616,8 +674,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
                     info != null
                     && event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                     && !info.isFocused()
-                    && SelectionRectView != null
-                    && SelectionRectView.IsSameNodeHash(info)
+                    && IsDrawnNode(info)
             ) {
                 Log.d(TAG3, "FOCUS MOVED OUT: HASH: "+info.hashCode());
                 SetCurrentNodeInfo(null);
@@ -657,8 +714,25 @@ public class K12KbAccessibilityService extends AccessibilityService {
                 }
             }
 
+            // Рамка идёт первой, кликер после: PreparePointerClickHack через
+            // SetCurrentNodeInfo дёргает пересчёт подписки, то есть в худшем
+            // случае обращение к system_server перед самой отрисовкой.
+            boolean focusEvent = event.getEventType() == AccessibilityEvent.TYPE_VIEW_FOCUSED;
+            // На каждый посланный DPAD мы рисуем предсказание и ждём ровно одно
+            // событие о смене фокуса. Пока ожиданий больше одного, приходящее
+            // событие описывает шаг, с которого мы уже ушли. Последнее
+            // принимаем всегда — это точка, где промах focusSearch исправляется.
+            boolean staleForPrediction = false;
+            if (focusEvent) {
+                if (pendingPredictions > 0
+                        && SystemClock.uptimeMillis() - lastPredictAt > PREDICTION_WAIT_MS)
+                    pendingPredictions = 0;
+                if (pendingPredictions > 0) {
+                    pendingPredictions--;
+                    staleForPrediction = pendingPredictions > 0;
+                }
+            }
             if (k12KbAccServiceOptions.SelectedNodeClickHack) {
-                //Имитация click в приложениях (Telegram, BB.Hub) где не работает симуляция KEYCODE_ENTER/SPACE
                 if (info != null) {
                     PreparePointerClickHack(info);
                 } else {
@@ -666,11 +740,10 @@ public class K12KbAccessibilityService extends AccessibilityService {
                 }
             }
             if (k12KbAccServiceOptions.SelectedNodeHighlight
+                    && !staleForPrediction
                     && K12KbIME.Instance != null && K12KbIME.Instance.pref_pointer_mode_rect_and_autofocus) {
                 if (info != null) {
-                    //if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
                     ProcessSelectionRectangle(info);
-                    //}
                 } else {
                     TryRemoveRectangle();
                 }
@@ -735,7 +808,9 @@ public class K12KbAccessibilityService extends AccessibilityService {
             info1 = info.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY);
         }
         if(info1 != null) {
-            Log.d(TAG3, "GetFocusedNode findFocus FOUND HASH: "+info1.hashCode());
+            Log.d(TAG3, "GetFocusedNode findFocus FOUND HASH: "+info1.hashCode()
+                    + " focused=" + info1.isFocused() + " a11yFocused=" + info1.isAccessibilityFocused()
+                    + " cls=" + info1.getClassName() + " txt=" + info1.getText());
             return info1;
         } else {
             Log.d(TAG3, "GetFocusedNode findFocus NOT FOUND");
@@ -756,41 +831,81 @@ public class K12KbAccessibilityService extends AccessibilityService {
         return null;
     }
 
+     /**
+     * Окно рамки живёт на своём потоке.
+     *
+     * ViewRootImpl привязывается к тому потоку, из которого окно добавлено,
+     * поэтому рамке достаточно своего Looper'а: её отрисовка больше не стоит в
+     * очереди за разбором жестов и посылкой DPAD, которые идут в главном
+     * потоке вместе со службой и IME. Границы считаются на главном потоке и
+     * передаются готовым Rect — в onDraw нет ни узлов, ни обращений к чужому
+     * приложению.
+     */
+    private HandlerThread rectThread;
+    private Handler rectHandler;
+    /** Только из rectHandler. */
+    private RectView SelectionRectView;
+    /** Только из rectHandler. */
+    private boolean rectViewAdded = false;
+
+    /** Что сейчас показано — состояние главного потока. */
+    private AccessibilityNodeInfo drawnNode;
+    private Rect drawnRect;
+
+    private void EnsureRectThread() {
+        if (rectHandler != null)
+            return;
+        rectThread = new HandlerThread("K12KbRect", android.os.Process.THREAD_PRIORITY_DISPLAY);
+        rectThread.start();
+        rectHandler = new Handler(rectThread.getLooper());
+    }
+
+    /** Показан ли сейчас именно этот узел. */
+    private boolean IsDrawnNode(AccessibilityNodeInfo info) {
+        return drawnNode != null && info != null && drawnNode.hashCode() == info.hashCode();
+    }
+
      private void ProcessSelectionRectangle(AccessibilityNodeInfo info) {
+
+        // refresh() — обращение к UI-потоку чужого приложения, и как раз в этот
+        // момент оно занято отрисовкой своего выделения. На событии фокуса он
+        // не нужен: узел пришёл из самого события. Нужен там, где узел мог
+        // протухнуть, — после прокрутки.
 
         Rect rect = new Rect();
         info.getBoundsInScreen(rect);
-        //Если квадрат
-        if(SelectionRectView == null) {
-            //&& Math.abs(rect.top - rect.bottom) < 1620/2
-            SelectionRectView = CreateRectangleView();
-            LestSelectionRectView = SelectionRectView;
-            Log.d(TAG3, "DRAW [ASYNC] FIRST-TIME HASH: "+info.hashCode());
-            SelectionRectView.SetNodeInfo(info);
-            SelectionRectView.removed = false;
-            SelectionRectView.RemoveRectOnNextDraw = false;
-            _currentWindowManager.addView(SelectionRectView, _layoutParams);
+
+        if (IsDrawnNode(info) && rect.equals(drawnRect)) {
+            Log.d(TAG3, "то же место, перерисовка не нужна HASH: "+info.hashCode());
             return;
         }
 
-        if(!SelectionRectView.removed && !SelectionRectView.RemoveRectOnNextDraw && SelectionRectView.IsSameNodeAndRect(info)) {
-            Log.d(TAG3, "SelectionRectView.IsSameRect(info) HASH: "+info.hashCode());
-            return;
-        }
-
-        if(!SelectionRectView.removed && !SelectionRectView.RemoveRectOnNextDraw)
-            TryRemoveRectangle();
-        Log.d(TAG3, "DRAW [ASYNC] REDRAW HASH: "+info.hashCode());
-        SelectionRectView.RemoveRectOnNextDraw = false;
-        SelectionRectView.SetNodeInfo(info);
-        SelectionRectView.setVisibility(View.GONE);
-        SelectionRectView.setVisibility(View.VISIBLE);
+        Log.d(TAG3, "DRAW HASH: "+info.hashCode()+" rect="+rect.toShortString());
+        drawnNode = info;
+        drawnRect = rect;
+        PostRect(rect);
     }
 
-
-
-    RectView SelectionRectView;
-    RectView LestSelectionRectView;
+    /** Отдать рамке новые границы. Возврат на её поток. */
+    private void PostRect(final Rect rect) {
+        EnsureRectThread();
+        rectHandler.post(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (SelectionRectView == null)
+                        SelectionRectView = CreateRectangleView();
+                    if (!rectViewAdded) {
+                        _currentWindowManager.addView(SelectionRectView, _layoutParams);
+                        rectViewAdded = true;
+                    }
+                    SelectionRectView.TargetRect = rect;
+                    SelectionRectView.invalidate();
+                } catch (Throwable ex) {
+                    Log.e(TAG3, "PostRect: " + ex);
+                }
+            }
+        });
+    }
 
     private RectView CreateRectangleView() {
         RectView rectView = new RectView(this);
@@ -799,16 +914,13 @@ public class K12KbAccessibilityService extends AccessibilityService {
         rectView.setFocusableInTouchMode(false);
         rectView.setLongClickable(false);
         rectView.setKeepScreenOn(false);
-        //rectView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-
         return rectView;
     }
 
-
     class RectView extends View {
 
-        public AccessibilityNodeInfo SelectedNode;
-        public Rect SelectedNodeRect;
+        /** Границы на экране, которые надо нарисовать. null — рамки нет. */
+        volatile Rect TargetRect;
 
         public RectView(Context context) {
             super(context);
@@ -819,40 +931,6 @@ public class K12KbAccessibilityService extends AccessibilityService {
             paintMainer.setColor(color);
             paintMainer.setStrokeWidth(3);
             paintMainer.setStyle(Paint.Style.STROKE);
-
-            paintTransparenter = new Paint();
-            paintTransparenter.setAlpha(0);
-            paintTransparenter.setStrokeWidth(3);
-            paintTransparenter.setStyle(Paint.Style.STROKE);
-        }
-
-        public void SetNodeInfo(AccessibilityNodeInfo info) {
-            SelectedNode = info;
-        }
-
-        public boolean IsSameNodeAndRect(AccessibilityNodeInfo info) {
-            if(SelectedNode != null && SelectedNode.hashCode() == info.hashCode() && IsSameRect(info))
-                return true;
-            return false;
-        }
-
-        public boolean IsSameNodeHash(AccessibilityNodeInfo info) {
-            if(SelectedNode != null && SelectedNode.hashCode() == info.hashCode())
-                return true;
-            return false;
-        }
-
-        private boolean IsSameRect(AccessibilityNodeInfo info) {
-            if(SelectedNodeRect == null)
-                return true;
-            Rect rect = new Rect();
-            info.getBoundsInScreen(rect);
-            if(rect.top == SelectedNodeRect.top
-            && rect.bottom == SelectedNodeRect.bottom
-            && rect.left == SelectedNodeRect.left
-            && rect.right == SelectedNodeRect.right)
-                return true;
-            return false;
         }
 
         public RectView(Context context, @Nullable AttributeSet attrs) {
@@ -865,54 +943,22 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
         @Override
         protected void onDraw(Canvas canvas) {
-
-            //Toast.makeText(K12KbAccessibilityService.Instance, "rectView.isHardwareAccelerated(): "+canvas.isHardwareAccelerated(), Toast.LENGTH_SHORT).show();
-            if(SelectedNode == null)
+            Rect r = TargetRect;
+            if (r == null)
                 return;
-
-            if(RemoveRectOnNextDraw) {
-
-
-                SelectedNodeRect = new Rect();
-                SelectedNode.getBoundsInScreen(SelectedNodeRect);
-
-                canvas.drawRect(SelectedNodeRect, paintTransparenter);
-                Log.d(TAG3, "OnDraw() HIDE");
-                removed = true;
-                RemoveRectOnNextDraw = false;
-                SetNodeInfo(null);
-                return;
-            }
-
-            Log.d(TAG3, "OnDraw() SHOW");
-            removed = false;
-            SelectedNodeRect = new Rect();
-            SelectedNode.getBoundsInScreen(SelectedNodeRect);
             /** deltaY нужен чтобы делать смещение рамки на величину пустого черного поля в Unihertz Titan Slim,
              * в Key1-2 delta=0 и все работает и без этого хака*/
             int[] locationOnScreen = new int[2];
             getLocationOnScreen(locationOnScreen);
-            int dx = locationOnScreen[0];
             int dy = locationOnScreen[1];
-            SelectedNodeRect = new Rect(SelectedNodeRect.left, SelectedNodeRect.top - dy, SelectedNodeRect.right, SelectedNodeRect.bottom - dy);
             //Большое выделение не нужно - это скорее всего isSelectable крупных блоков-контейнеров
-            if(Math.abs(SelectedNodeRect.top - SelectedNodeRect.bottom) < 1620/3*2)
-                canvas.drawRect(SelectedNodeRect, paintMainer);
+            if(Math.abs(r.top - r.bottom) >= 1620/3*2)
+                return;
+            canvas.drawRect(r.left, r.top - dy, r.right, r.bottom - dy, paintMainer);
         }
 
-        public boolean RemoveRectOnNextDraw;
-
-        public boolean removed;
-
         Paint paintMainer;
-
-        Paint paintTransparenter;
     }
-
-
-
-
-
 
     private static WindowManager.LayoutParams InitializeLayoutParams() {
         WindowManager.LayoutParams lp1 = new WindowManager.LayoutParams();
@@ -925,42 +971,83 @@ public class K12KbAccessibilityService extends AccessibilityService {
                 | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
                 | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
 
-
         lp1.width = WindowManager.LayoutParams.WRAP_CONTENT;
         lp1.height = WindowManager.LayoutParams.WRAP_CONTENT;
         lp1.gravity = Gravity.FILL;
         return lp1;
     }
 
-    public boolean TryRemoveRectangle() {
-        if(SelectionRectView == null)
-            return false;
-        if(!SelectionRectView.RemoveRectOnNextDraw && !SelectionRectView.removed) {
-            Log.d(TAG3, "REMOVE_ASYNC_SIGNAL! TryRemoveRectangle() HASH: "+SelectionRectView.SelectedNode.hashCode());
-
-            SelectionRectView.RemoveRectOnNextDraw = true;
-            SelectionRectView.setVisibility(View.GONE);
-            SelectionRectView.setVisibility(View.VISIBLE);
-
-            return true;
+    /**
+     * Нарисовать рамку на том узле, который получит фокус, не дожидаясь события.
+     *
+     * Шаг курсора делаем мы сами, посылая DPAD, поэтому направление известно
+     * раньше, чем приложение успеет о нём сообщить: событие о смене фокуса
+     * доезжает за 25 мс (медиана по 28 шагам), плюс кадр на отрисовку.
+     * focusSearch спрашивает у приложения тот же узел, который оно само сейчас
+     * сфокусирует.
+     */
+    public void PredictSelectionStep(int viewFocusDirection) {
+        try {
+            if (k12KbAccServiceOptions == null || !k12KbAccServiceOptions.SelectedNodeHighlight)
+                return;
+            K12KbIME ime = K12KbIME.Instance;
+            if (ime == null || !ime.pref_pointer_mode_rect_and_autofocus)
+                return;
+            if (drawnNode == null)
+                return;
+            AccessibilityNodeInfo next = drawnNode.focusSearch(viewFocusDirection);
+            if (next == null) {
+                Log.d(TAG3, "ПРЕДСКАЗАНИЕ: focusSearch вернул пусто");
+                return;
+            }
+            if (IsDrawnNode(next))
+                return;
+            Log.d(TAG3, "ПРЕДСКАЗАНИЕ: рисуем заранее HASH: " + next.hashCode());
+            lastPredictAt = SystemClock.uptimeMillis();
+            pendingPredictions++;
+            ProcessSelectionRectangle(next);
+        } catch (Throwable ex) {
+            Log.e(TAG3, "PredictSelectionStep: " + ex);
         }
-        return false;
     }
 
-    public boolean TryRemoveRectangleFast() {
-        if(SelectionRectView == null)
+    /** Когда мы в последний раз нарисовали рамку на предсказанном узле. */
+    private long lastPredictAt = 0;
+    /** Сколько событий о смене фокуса мы ещё ждём по своим предсказаниям. */
+    private int pendingPredictions = 0;
+    /** Сколько ждать событие на свой шаг, прежде чем считать, что его не будет. */
+    private static final long PREDICTION_WAIT_MS = 400;
+
+    public boolean TryRemoveRectangle() {
+        if (drawnRect == null && drawnNode == null)
             return false;
-        if(!SelectionRectView.RemoveRectOnNextDraw && !SelectionRectView.removed) {
-            Log.d(TAG3, "TryRemoveRectangleFast() HASH: "+SelectionRectView.SelectedNode.hashCode());
+        Log.d(TAG3, "СТЕРЕТЬ РАМКУ");
+        drawnNode = null;
+        drawnRect = null;
+        PostRect(null);
+        return true;
+    }
 
-            //SelectionRectView.setVisibility(View.INVISIBLE);
-            //SelectionRectView.invalidate();
-
-            _currentWindowManager.removeViewImmediate(SelectionRectView);
-            SelectionRectView = null;
-            return true;
-        }
-        return false;
+    /** Убрать и само окно — когда рамка не нужна надолго. */
+    public boolean TryRemoveRectangleFast() {
+        drawnNode = null;
+        drawnRect = null;
+        if (rectHandler == null)
+            return false;
+        rectHandler.post(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (SelectionRectView != null && rectViewAdded) {
+                        _currentWindowManager.removeViewImmediate(SelectionRectView);
+                        rectViewAdded = false;
+                        SelectionRectView = null;
+                    }
+                } catch (Throwable ex) {
+                    Log.e(TAG3, "TryRemoveRectangleFast: " + ex);
+                }
+            }
+        });
+        return true;
     }
 
     //endregion
