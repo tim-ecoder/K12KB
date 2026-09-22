@@ -155,6 +155,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
     public void onDestroy() {
         Log.v(TAG3, "onDestroy()");
         CancelPendingSearch();
+        DestroyRectangleWindow();
         if (imeChangeObserver != null) {
             try {
                 getContentResolver().unregisterContentObserver(imeChangeObserver);
@@ -847,13 +848,23 @@ public class K12KbAccessibilityService extends AccessibilityService {
     private RectView SelectionRectView;
     /** Только из rectHandler. */
     private boolean rectViewAdded = false;
+    /**
+     * Each show or clear request has an increasing generation.  The UI work is
+     * queued on another thread, so this keeps an old show request from bringing
+     * a frame back after its node has lost focus.
+     */
+    private volatile long rectRequestGeneration = 0;
+    private volatile boolean rectThreadStopping = false;
+
+    private static final int RECT_STROKE_WIDTH_PX = 3;
+    private static final int RECT_WINDOW_PADDING_PX = RECT_STROKE_WIDTH_PX + 2;
 
     /** Что сейчас показано — состояние главного потока. */
     private AccessibilityNodeInfo drawnNode;
     private Rect drawnRect;
 
     private void EnsureRectThread() {
-        if (rectHandler != null)
+        if (rectHandler != null || rectThreadStopping)
             return;
         rectThread = new HandlerThread("K12KbRect", android.os.Process.THREAD_PRIORITY_DISPLAY);
         rectThread.start();
@@ -874,6 +885,12 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
         Rect rect = new Rect();
         info.getBoundsInScreen(rect);
+        rect = GetDrawableSelectionRect(rect);
+        if (rect == null) {
+            Log.d(TAG3, "DRAW: непригодные границы, убрать рамку");
+            TryRemoveRectangle();
+            return;
+        }
 
         if (IsDrawnNode(info) && rect.equals(drawnRect)) {
             Log.d(TAG3, "то же место, перерисовка не нужна HASH: "+info.hashCode());
@@ -883,25 +900,71 @@ public class K12KbAccessibilityService extends AccessibilityService {
         Log.d(TAG3, "DRAW HASH: "+info.hashCode()+" rect="+rect.toShortString());
         drawnNode = info;
         drawnRect = rect;
-        PostRect(rect);
+        PostRectangle(rect);
     }
 
-    /** Отдать рамке новые границы. Возврат на её поток. */
-    private void PostRect(final Rect rect) {
+    /**
+     * Bounds from AccessibilityNodeInfo are in display coordinates.  The
+     * overlay window is only as large as the frame, so RectView receives local
+     * coordinates after the window position is chosen.
+     */
+    private Rect GetDrawableSelectionRect(Rect rect) {
+        if (rect == null || rect.isEmpty())
+            return null;
+        Point displaySize = new Point();
+        try {
+            _currentWindowManager.getDefaultDisplay().getRealSize(displaySize);
+        } catch (Throwable ex) {
+            displaySize.x = getResources().getDisplayMetrics().widthPixels;
+            displaySize.y = getResources().getDisplayMetrics().heightPixels;
+        }
+        if (displaySize.x <= 0 || displaySize.y <= 0)
+            return null;
+        Rect display = new Rect(0, 0, displaySize.x, displaySize.y);
+        Rect clipped = new Rect(rect);
+        if (!clipped.intersect(display) || clipped.isEmpty())
+            return null;
+        // Large selectable containers are not a useful pointer target.  This
+        // replaces the old KEY2-only 1080 px threshold with the real display.
+        if (clipped.height() * 3 >= display.height() * 2)
+            return null;
+        return clipped;
+    }
+
+    /** Queue a tightly bounded frame. */
+    private void PostRectangle(final Rect screenRect) {
         EnsureRectThread();
+        if (rectHandler == null)
+            return;
+        final long generation = ++rectRequestGeneration;
+        final Rect rect = new Rect(screenRect);
         rectHandler.post(new Runnable() {
             @Override public void run() {
+                if (rectThreadStopping || generation != rectRequestGeneration)
+                    return;
                 try {
                     if (SelectionRectView == null)
                         SelectionRectView = CreateRectangleView();
+                    int left = Math.max(0, rect.left - RECT_WINDOW_PADDING_PX);
+                    int top = Math.max(0, rect.top - RECT_WINDOW_PADDING_PX);
+                    int right = rect.right + RECT_WINDOW_PADDING_PX;
+                    int bottom = rect.bottom + RECT_WINDOW_PADDING_PX;
+                    _layoutParams.width = Math.max(1, right - left);
+                    _layoutParams.height = Math.max(1, bottom - top);
+                    _layoutParams.x = left;
+                    _layoutParams.y = top;
+                    SelectionRectView.TargetRect = new Rect(
+                            rect.left - left, rect.top - top,
+                            rect.right - left, rect.bottom - top);
                     if (!rectViewAdded) {
                         _currentWindowManager.addView(SelectionRectView, _layoutParams);
                         rectViewAdded = true;
+                    } else {
+                        _currentWindowManager.updateViewLayout(SelectionRectView, _layoutParams);
                     }
-                    SelectionRectView.TargetRect = rect;
                     SelectionRectView.invalidate();
                 } catch (Throwable ex) {
-                    Log.e(TAG3, "PostRect: " + ex);
+                    Log.e(TAG3, "PostRectangle: " + ex);
                 }
             }
         });
@@ -929,7 +992,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
                 color = K12KbIME.Instance.pref_pointer_mode_rect_color;
             paintMainer = new Paint();
             paintMainer.setColor(color);
-            paintMainer.setStrokeWidth(3);
+            paintMainer.setStrokeWidth(RECT_STROKE_WIDTH_PX);
             paintMainer.setStyle(Paint.Style.STROKE);
         }
 
@@ -946,15 +1009,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
             Rect r = TargetRect;
             if (r == null)
                 return;
-            /** deltaY нужен чтобы делать смещение рамки на величину пустого черного поля в Unihertz Titan Slim,
-             * в Key1-2 delta=0 и все работает и без этого хака*/
-            int[] locationOnScreen = new int[2];
-            getLocationOnScreen(locationOnScreen);
-            int dy = locationOnScreen[1];
-            //Большое выделение не нужно - это скорее всего isSelectable крупных блоков-контейнеров
-            if(Math.abs(r.top - r.bottom) >= 1620/3*2)
-                return;
-            canvas.drawRect(r.left, r.top - dy, r.right, r.bottom - dy, paintMainer);
+            canvas.drawRect(r.left, r.top, r.right, r.bottom, paintMainer);
         }
 
         Paint paintMainer;
@@ -966,14 +1021,12 @@ public class K12KbAccessibilityService extends AccessibilityService {
         lp1.format = PixelFormat.TRANSLUCENT;
 
         lp1.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_FULLSCREEN
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
-                | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
 
-        lp1.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp1.height = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp1.gravity = Gravity.FILL;
+        lp1.width = 1;
+        lp1.height = 1;
+        lp1.gravity = Gravity.TOP | Gravity.START;
         return lp1;
     }
 
@@ -1019,35 +1072,67 @@ public class K12KbAccessibilityService extends AccessibilityService {
     private static final long PREDICTION_WAIT_MS = 400;
 
     public boolean TryRemoveRectangle() {
-        if (drawnRect == null && drawnNode == null)
-            return false;
+        boolean hadRectangle = drawnRect != null || drawnNode != null;
         Log.d(TAG3, "СТЕРЕТЬ РАМКУ");
         drawnNode = null;
         drawnRect = null;
-        PostRect(null);
-        return true;
+        RemoveRectangleWindow();
+        return hadRectangle;
     }
 
     /** Убрать и само окно — когда рамка не нужна надолго. */
     public boolean TryRemoveRectangleFast() {
+        boolean hadRectangle = drawnRect != null || drawnNode != null;
         drawnNode = null;
         drawnRect = null;
+        RemoveRectangleWindow();
+        return hadRectangle;
+    }
+
+    /** Remove the actual WindowManager layer, including after a logical clear. */
+    private void RemoveRectangleWindow() {
+        final long generation = ++rectRequestGeneration;
         if (rectHandler == null)
-            return false;
+            return;
         rectHandler.post(new Runnable() {
             @Override public void run() {
+                if (generation != rectRequestGeneration)
+                    return;
                 try {
                     if (SelectionRectView != null && rectViewAdded) {
                         _currentWindowManager.removeViewImmediate(SelectionRectView);
-                        rectViewAdded = false;
-                        SelectionRectView = null;
                     }
+                    rectViewAdded = false;
+                    SelectionRectView = null;
                 } catch (Throwable ex) {
-                    Log.e(TAG3, "TryRemoveRectangleFast: " + ex);
+                    Log.e(TAG3, "RemoveRectangleWindow: " + ex);
                 }
             }
         });
-        return true;
+    }
+
+    /** Service shutdown must not leave either an overlay or its display thread. */
+    private void DestroyRectangleWindow() {
+        rectThreadStopping = true;
+        final Handler handler = rectHandler;
+        final HandlerThread thread = rectThread;
+        rectRequestGeneration++;
+        if (handler == null || thread == null)
+            return;
+        handler.post(new Runnable() {
+            @Override public void run() {
+                try {
+                    if (SelectionRectView != null && rectViewAdded)
+                        _currentWindowManager.removeViewImmediate(SelectionRectView);
+                } catch (Throwable ex) {
+                    Log.e(TAG3, "DestroyRectangleWindow: " + ex);
+                } finally {
+                    rectViewAdded = false;
+                    SelectionRectView = null;
+                    thread.quitSafely();
+                }
+            }
+        });
     }
 
     //endregion
