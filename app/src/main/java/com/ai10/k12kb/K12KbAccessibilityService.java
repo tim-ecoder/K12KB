@@ -1576,6 +1576,8 @@ public class K12KbAccessibilityService extends AccessibilityService {
         }
     }
     private long lastBackResendUptime = 0;
+    private long consumedBackDownTime = -1;
+    private int consumedBackDeviceId;
     /** Ждём ли сейчас закрытия панели, чтобы перевыпустить BACK. */
     private boolean backResendPending = false;
     /**
@@ -1598,6 +1600,17 @@ public class K12KbAccessibilityService extends AccessibilityService {
         if (kc == KeyEvent.KEYCODE_HOME || kc == KeyEvent.KEYCODE_APP_SWITCH)
             return false;
 
+        // The original press stays consumed even if hiding the panel changes
+        // input mode or the replacement BACK has already been sent. In
+        // particular, its UP must not escape through the resend time window.
+        if (kc == KeyEvent.KEYCODE_BACK
+                && event.getDownTime() == consumedBackDownTime
+                && event.getDeviceId() == consumedBackDeviceId) {
+            if (event.getAction() == KeyEvent.ACTION_UP)
+                consumedBackDownTime = -1;
+            return true;
+        }
+
         // Android 16 BACK workaround: when IME has visible UI, framework's
         // OnBackInvokedCallback either hides IME (1st press) and only navigates on
         // 2nd press, or with WILL_NOT_DISMISS does nothing at all. We want 1-press
@@ -1605,7 +1618,8 @@ public class K12KbAccessibilityService extends AccessibilityService {
         if (Build.VERSION.SDK_INT >= 36
                 && kc == KeyEvent.KEYCODE_BACK
                 && K12KbIME.Instance != null
-                && K12KbIME.Instance.IsInputMode()) {
+                && K12KbIME.Instance.IsInputMode()
+                && K12KbIME.Instance.isInputViewShown()) {
             long now = android.os.SystemClock.uptimeMillis();
             // Let our own re-injected BACK pass through (within 250ms window).
             // Отсчёт идёт от момента перевыпуска, а не от нажатия: скрытие
@@ -1617,6 +1631,8 @@ public class K12KbAccessibilityService extends AccessibilityService {
             if (event.getAction() == KeyEvent.ACTION_DOWN
                     && event.getRepeatCount() == 0
                     && !backResendPending) {
+                consumedBackDownTime = event.getDownTime();
+                consumedBackDeviceId = event.getDeviceId();
                 backResendPending = true;
                 // 1) Hide IME panels (so framework no longer registers a back callback)
                 try {
