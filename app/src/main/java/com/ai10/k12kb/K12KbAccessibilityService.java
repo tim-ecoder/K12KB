@@ -857,8 +857,6 @@ public class K12KbAccessibilityService extends AccessibilityService {
     private volatile boolean rectThreadStopping = false;
 
     private static final int RECT_STROKE_WIDTH_PX = 3;
-    private static final int RECT_WINDOW_PADDING_PX = RECT_STROKE_WIDTH_PX + 2;
-
     /** Что сейчас показано — состояние главного потока. */
     private AccessibilityNodeInfo drawnNode;
     private Rect drawnRect;
@@ -905,8 +903,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
     /**
      * Bounds from AccessibilityNodeInfo are in display coordinates.  The
-     * overlay window is only as large as the frame, so RectView receives local
-     * coordinates after the window position is chosen.
+     * overlay is clipped to the display before it is handed to RectView.
      */
     private Rect GetDrawableSelectionRect(Rect rect) {
         if (rect == null || rect.isEmpty())
@@ -931,7 +928,11 @@ public class K12KbAccessibilityService extends AccessibilityService {
         return clipped;
     }
 
-    /** Queue a tightly bounded frame. */
+    /**
+     * Queue a frame on one stable display-sized surface.  Moving a WindowManager
+     * window on every DPAD step lags behind rapid navigation; the surface exists
+     * only while a frame is visible and is removed by TryRemoveRectangle.
+     */
     private void PostRectangle(final Rect screenRect) {
         EnsureRectThread();
         if (rectHandler == null)
@@ -940,27 +941,16 @@ public class K12KbAccessibilityService extends AccessibilityService {
         final Rect rect = new Rect(screenRect);
         rectHandler.post(new Runnable() {
             @Override public void run() {
-                if (rectThreadStopping || generation != rectRequestGeneration)
+                if (rectThreadStopping || generation != rectRequestGeneration) {
                     return;
+                }
                 try {
                     if (SelectionRectView == null)
                         SelectionRectView = CreateRectangleView();
-                    int left = Math.max(0, rect.left - RECT_WINDOW_PADDING_PX);
-                    int top = Math.max(0, rect.top - RECT_WINDOW_PADDING_PX);
-                    int right = rect.right + RECT_WINDOW_PADDING_PX;
-                    int bottom = rect.bottom + RECT_WINDOW_PADDING_PX;
-                    _layoutParams.width = Math.max(1, right - left);
-                    _layoutParams.height = Math.max(1, bottom - top);
-                    _layoutParams.x = left;
-                    _layoutParams.y = top;
-                    SelectionRectView.TargetRect = new Rect(
-                            rect.left - left, rect.top - top,
-                            rect.right - left, rect.bottom - top);
+                    SelectionRectView.TargetRect = rect;
                     if (!rectViewAdded) {
                         _currentWindowManager.addView(SelectionRectView, _layoutParams);
                         rectViewAdded = true;
-                    } else {
-                        _currentWindowManager.updateViewLayout(SelectionRectView, _layoutParams);
                     }
                     SelectionRectView.invalidate();
                 } catch (Throwable ex) {
@@ -1009,7 +999,12 @@ public class K12KbAccessibilityService extends AccessibilityService {
             Rect r = TargetRect;
             if (r == null)
                 return;
-            canvas.drawRect(r.left, r.top, r.right, r.bottom, paintMainer);
+            // Screen bounds from AccessibilityNodeInfo need the window origin
+            // removed; on KEY1|2 it is zero, while Slim can have a top inset.
+            int[] locationOnScreen = new int[2];
+            getLocationOnScreen(locationOnScreen);
+            canvas.drawRect(r.left - locationOnScreen[0], r.top - locationOnScreen[1],
+                    r.right - locationOnScreen[0], r.bottom - locationOnScreen[1], paintMainer);
         }
 
         Paint paintMainer;
@@ -1021,12 +1016,14 @@ public class K12KbAccessibilityService extends AccessibilityService {
         lp1.format = PixelFormat.TRANSLUCENT;
 
         lp1.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_FULLSCREEN
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+                | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
+                | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
 
-        lp1.width = 1;
-        lp1.height = 1;
-        lp1.gravity = Gravity.TOP | Gravity.START;
+        lp1.width = WindowManager.LayoutParams.MATCH_PARENT;
+        lp1.height = WindowManager.LayoutParams.MATCH_PARENT;
+        lp1.gravity = Gravity.FILL;
         return lp1;
     }
 
