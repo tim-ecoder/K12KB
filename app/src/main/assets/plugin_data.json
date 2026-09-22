@@ -27,6 +27,7 @@
     }, {
       "package-name": "org.telegram.messenge",
       "additional-event-type-type-window-content-changed": true,
+      "wait-before-send-char-ms": 150,
       "dynamic-search-method": [
         {
           "dynamic-search-method-function": "FindAccessibilityNodeInfosByText",
