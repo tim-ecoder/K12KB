@@ -7,6 +7,7 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.accessibilityservice.GestureDescription;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.*;
 import android.os.Build;
 import android.os.Handler;
@@ -340,7 +341,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
                     // Уходя, прибираем за собой: висящая подсветка и выбранный узел
                     // относятся к нашему режиму курсора.
                     SetCurrentNodeInfo(null);
-                    TryRemoveRectangleFast();
+                    TryRemoveRectangle();
                 }
                 RefreshEventTypeSubscription();
             }
@@ -649,7 +650,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
         }
 
         if(K12KbIME.Instance != null && !K12KbIME.Instance.pref_pointer_mode_rect_and_autofocus) {
-            TryRemoveRectangleFast();
+            TryRemoveRectangle();
         }
 
         Log.d(TAG3,"ProcessGesturePointerModeAndNodeSelection:LOGIC");
@@ -664,7 +665,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
 
         if(event.getEventType() == AccessibilityEvent.TYPE_WINDOWS_CHANGED && event.getWindowId() == -1) {
             SetCurrentNodeInfo(null);
-            TryRemoveRectangleFast();
+            TryRemoveRectangle();
             return;
         }
 
@@ -679,7 +680,7 @@ public class K12KbAccessibilityService extends AccessibilityService {
             ) {
                 Log.d(TAG3, "FOCUS MOVED OUT: HASH: "+info.hashCode());
                 SetCurrentNodeInfo(null);
-                TryRemoveRectangleFast();
+                TryRemoveRectangle();
                 return;
             }
 
@@ -902,12 +903,17 @@ public class K12KbAccessibilityService extends AccessibilityService {
     }
 
     /**
-     * Bounds from AccessibilityNodeInfo are in display coordinates.  The
-     * overlay is clipped to the display before it is handed to RectView.
+     * Размер экрана спрашивается не на каждый шаг курсора.
+     *
+     * Меняется он только на повороте, поэтому считается один раз и обновляется
+     * по onConfigurationChanged. В режиме курсора эта проверка идёт на каждый
+     * DPAD-шаг, а шаги бывают чаще, чем раз в 50 мс.
      */
-    private Rect GetDrawableSelectionRect(Rect rect) {
-        if (rect == null || rect.isEmpty())
-            return null;
+    private final Rect displayRect = new Rect();
+
+    private Rect GetDisplayRect() {
+        if (!displayRect.isEmpty())
+            return displayRect;
         Point displaySize = new Point();
         try {
             _currentWindowManager.getDefaultDisplay().getRealSize(displaySize);
@@ -917,7 +923,27 @@ public class K12KbAccessibilityService extends AccessibilityService {
         }
         if (displaySize.x <= 0 || displaySize.y <= 0)
             return null;
-        Rect display = new Rect(0, 0, displaySize.x, displaySize.y);
+        displayRect.set(0, 0, displaySize.x, displaySize.y);
+        return displayRect;
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Поворот — единственное, что меняет размер экрана; пересчитаем лениво.
+        displayRect.setEmpty();
+    }
+
+    /**
+     * Bounds from AccessibilityNodeInfo are in display coordinates.  The
+     * overlay is clipped to the display before it is handed to RectView.
+     */
+    private Rect GetDrawableSelectionRect(Rect rect) {
+        if (rect == null || rect.isEmpty())
+            return null;
+        Rect display = GetDisplayRect();
+        if (display == null)
+            return null;
         Rect clipped = new Rect(rect);
         if (!clipped.intersect(display) || clipped.isEmpty())
             return null;
@@ -1068,18 +1094,16 @@ public class K12KbAccessibilityService extends AccessibilityService {
     /** Сколько ждать событие на свой шаг, прежде чем считать, что его не будет. */
     private static final long PREDICTION_WAIT_MS = 400;
 
+    /**
+     * Убрать рамку вместе с её окном.
+     *
+     * Раньше это были два метода: TryRemoveRectangle гасила саму рамку, а
+     * TryRemoveRectangleFast сносила ещё и окно. С тех пор как снятие рамки
+     * всегда удаляет слой, они делали одно и то же побайтово.
+     */
     public boolean TryRemoveRectangle() {
         boolean hadRectangle = drawnRect != null || drawnNode != null;
         Log.d(TAG3, "СТЕРЕТЬ РАМКУ");
-        drawnNode = null;
-        drawnRect = null;
-        RemoveRectangleWindow();
-        return hadRectangle;
-    }
-
-    /** Убрать и само окно — когда рамка не нужна надолго. */
-    public boolean TryRemoveRectangleFast() {
-        boolean hadRectangle = drawnRect != null || drawnNode != null;
         drawnNode = null;
         drawnRect = null;
         RemoveRectangleWindow();
